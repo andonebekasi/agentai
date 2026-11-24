@@ -21,27 +21,66 @@
 
 ---
 
-## 🚀 Cara Instalasi
+## 🚀 Cara Instalasi Langsung via curl (Satu Baris)
+
+Anda dapat menginstall FRP secara mandiri tanpa harus meng-clone repository ini terlebih dahulu.
 
 ### Skenario 1: Pada VPS Publik (FRP Server / `frps`)
-Jalankan script di VPS Anda:
+Jalankan di VPS Anda:
+
+**Mode Interaktif (Pilih & masukkan token di layar):**
 ```bash
-chmod +x install-frp.sh
-./install-frp.sh server --token "TOKEN_RAHASIA_ANDA"
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash
 ```
-Dashboard monitoring FRPS dapat diakses di:
-`http://IP-VPS:7500` (User: `admin`, Pass: `admin123456`)
+
+**Atau Otomatis Satu Baris:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- server --token "TOKEN_RAHASIA_ANDA"
+```
+- Dashboard Web UI Monitoring: `http://IP-VPS:7500` (User: `admin` / Pass: `admin123456`)
+- Port Tunnel: `7000`
+
+---
 
 ### Skenario 2: Pada Mesin Lokal / Host AgentAI (FRP Client / `frpc`)
-Jalankan script di host AgentAI lokal:
+Jalankan di server lokal atau komputer AgentAI yang berada di balik WiFi/NAT:
+
+**Mode Interaktif:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash
+```
+
+**Atau Otomatis Satu Baris:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- client --server-addr "IP_VPS_ANDA" --token "TOKEN_RAHASIA_ANDA"
+```
+
+Setelah aktif, seluruh dashboard AgentAI otomatis bisa diakses via IP VPS publik Anda:
+- **9Router**: `http://IP_VPS:20128`
+- **OpenClaw**: `http://IP_VPS:18789`
+- **Hermes**: `http://IP_VPS:8088`
+- **NanoClaw**: `http://IP_VPS:18790`
+- **M365 Router**: `http://IP_VPS:5365/v1`
+
+---
+
+## 🛠️ Instalasi dari File Lokal (Jika Repo Sudah di-Clone)
+
+Jika Anda sudah berada di dalam direktori repository:
 ```bash
 chmod +x install-frp.sh
+
+# Jalankan menu interaktif:
+./install-frp.sh
+
+# Atau langsung spesifik:
+./install-frp.sh server --token "TOKEN_RAHASIA_ANDA"
 ./install-frp.sh client --server-addr "IP_VPS_ANDA" --token "TOKEN_RAHASIA_ANDA"
 ```
 
-Atau jalankan melalui mode interaktif tanpa parameter:
+Untuk mencopot / uninstall FRP:
 ```bash
-./install-frp.sh
+./install-frp.sh --uninstall
 ```
 
 ---
@@ -54,4 +93,4 @@ Jika Anda lebih memilih menjalankan `frpc` melalui Docker Compose tanpa systemd:
    ```bash
    docker compose --profile frp up -d
    ```
-   Atau tambahkan `COMPOSE_PROFILES=frp` di file `.env`.
+   Atau tambahkan `ENABLE_FRP=true` di file `.env`.

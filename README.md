@@ -1,5 +1,11 @@
 # AgentAI Stack: Hermes, NanoClaw, OpenClaw, 9Router, M365 Agent CLI & FRP
 
+<div align="center">
+
+[ 🇮🇩 Bahasa Indonesia ](README.md) | [ 🇬🇧 English ](README_EN.md)
+
+</div>
+
 Stack lengkap berbasis Docker Compose untuk menjalankan ekosistem AI Agent mandiri (*self-hosted*):
 - **9Router**: Gateway LLM cerdas lokal (multi-provider routing, quota optimization, 3-tier fallback).
 - **OpenClaw**: Autonomous AI assistant dan gateway otomatisasi multi-channel (*latest*).
@@ -7,6 +13,7 @@ Stack lengkap berbasis Docker Compose untuk menjalankan ekosistem AI Agent mandi
 - **NanoClaw**: Lightweight, container-isolated personal AI assistant (*latest*).
 - **M365 Copilot Agent CLI**: CLI Agent Linux Microsoft 365 Copilot dengan akses Lokal, Docker, Browser RPA, dan AI Router Server (`m365 router`).
 - **FRP (Fast Reverse Proxy)**: Reverse proxy berkecepatan tinggi ([fatedier/frp](https://github.com/fatedier/frp)) untuk mengekspos seluruh AI agent dari balik NAT / WiFi lokal ke Internet via VPS publik secara aman dan terenkripsi.
+- **Universal AI CLI Installer**: Installer cepat satu baris via curl untuk **Google Gemini / Antigravity CLI (`agy` & `gemini`)**, **Anthropic Claude Code CLI (`claude`)**, dan **GitHub Copilot CLI (`copilot`)**.
 
 ---
 
@@ -45,19 +52,63 @@ Stack lengkap berbasis Docker Compose untuk menjalankan ekosistem AI Agent mandi
 
 ## 💻 Cara Install di Host / PC Baru (Semua OS Linux)
 
-Jika Anda memindahkan atau meng-clone repository ini ke server/PC lain yang **belum terpasang Docker, Docker Compose, atau M365 CLI**, jalankan script instalasi universal:
+### ⚡ 1. Instalasi Cepat via curl (Pilih Menu Sesuai Kebutuhan)
+Cukup jalankan satu baris perintah berikut pada terminal Linux (Debian, Ubuntu, CentOS, RHEL, Fedora, Rocky, Alma, Arch, Manjaro, Alpine, openSUSE):
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash
+```
+
+Menu interaktif akan muncul sehingga Anda dapat memilih paket instalasi sesuai kebutuhan:
+1. **[All-in-One Lengkap] OpenClaw + Hermes + NanoClaw + 9Router** *(Rekomendasi)*
+   - Auto-check & auto-install Docker Engine + Compose v2 (jika belum ada)
+   - Auto-install Andi Pangeran M365 Copilot Agent CLI (Tinggal login email M365)
+   - Opsi setup FRP Client untuk remote NAT traversal ke VPS
+2. **[AgentAI Stack Saja] OpenClaw + Hermes + NanoClaw + 9Router**
+   - Auto-check/install Docker + Auto-install M365 CLI (Tinggal login email M365)
+3. **[Docker Saja] Auto-Check & Install Docker Engine & Compose (v2)**
+   - Menjalankan `check-docker.sh` untuk distro Linux apa saja
+4. **[M365 CLI Saja] Andi Pangeran M365 Copilot Agent CLI**
+   - CLI Agent Linux + AI Router Port 5365 (Tinggal login email M365: `m365 login`)
+5. **[FRP Client] Fast Reverse Proxy Client (frpc)**
+   - Ekspos 9Router, OpenClaw, Hermes, NanoClaw, M365 dari balik NAT/WiFi ke VPS
+6. **[FRP Server] Fast Reverse Proxy Server (frps)**
+   - Pasang di VPS Publik untuk Tunnel & Web Dashboard Monitoring Port 7500
+7. **[FRP Keduanya] Pasang FRP Client & Server sekaligus di mesin ini**
+8. **[Uninstall FRP] Copot service & binary FRP dari sistem**
+9. **[AI CLIs] Install Gemini/AGY + Claude Code + GitHub Copilot CLI**
+
+#### Opsi Satu Baris Non-Interaktif:
+```bash
+# Install Full Stack otomatis:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash -s -- --all
+
+# Install Docker & Docker Compose saja:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash -s -- --docker
+
+# Install M365 CLI saja:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash -s -- --m365
+
+# Install Semua AI CLIs (Gemini/AGY + Claude + Copilot):
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash -s -- --ai-clis
+```
+
+---
+
+### 📁 2. Instalasi dari File Lokal (Jika Repo Sudah di-Clone)
+
+Jika Anda sudah meng-clone repository ini:
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
-Script [install.sh](file:///home/andi/script/poc-aws/agentai/install.sh) akan otomatis:
-1. Mendeteksi distro Linux Anda (Debian, Ubuntu, CentOS, RHEL, Fedora, Rocky, Alma, Arch, Manjaro, Alpine, openSUSE).
+Script `install.sh` akan otomatis:
+1. Mendeteksi distro Linux Anda.
 2. Memeriksa apakah Docker Engine dan Docker Compose (v2) sudah terpasang (menginstall otomatis jika belum ada).
 3. Mengaktifkan service daemon Docker dan memasukkan user non-root ke grup `docker`.
 4. Memeriksa & memasang **M365 Copilot Agent CLI** (`m365`) beserta browser Chromium Playwright & Cloudflared Quick Tunnel.
-5. Menyiapkan hak akses script dan langsung menjalankan stack ([start.sh](file:///home/andi/script/poc-aws/agentai/start.sh)).
+5. Menyiapkan hak akses script dan langsung menjalankan stack (`start.sh`).
 
 ---
 
@@ -69,12 +120,18 @@ Cukup jalankan script `start.sh`:
 ```bash
 ./start.sh
 ```
-Script ini akan:
-- Memeriksa Docker dan Docker Compose.
+Script ini otomatis:
+- **Auto-check & Auto-install Docker/Compose**: Menjalankan `check-docker.sh` yang otomatis memeriksa dan menginstall Docker Engine serta Docker Compose jika belum ada.
+- **Auto-install Andi Pangeran M365 CLI**: Memeriksa dan otomatis memasang M365 Copilot Agent CLI untuk digunakan oleh OpenClaw, Hermes Agent, NanoClaw, dan 9Router. Anda **tinggal login menggunakan email M365** (`m365 login`).
 - Menyiapkan file `.env` dari `.env.example` jika belum ada.
 - Menyiapkan direktori data persistent (`./data/`).
 - Mengunduh image terbaru (`decolua/9router:latest`, `ghcr.io/openclaw/openclaw:latest`, `nousresearch/hermes-agent:latest`) dan membangun `nanoclaw`.
 - Menjalankan seluruh container di background.
+
+> **Tips Cek Docker Saja:** Anda juga dapat menjalankan script mandiri `check-docker.sh` kapan saja untuk memeriksa atau menginstall Docker & Compose:
+> ```bash
+> ./check-docker.sh
+> ```
 
 ### 2. Memeriksa Status (`status.sh`)
 
@@ -171,6 +228,36 @@ Anda dapat mendaftarkan endpoint ini ke dalam **9Router** untuk digunakan oleh O
 
 ---
 
+## 🤖 Universal AI CLI Installer (Gemini/AGY, Claude Code, GitHub Copilot)
+
+Untuk memasang tool CLI AI developer resmi pada semua distro Linux (Debian, Ubuntu, CentOS, RHEL, Fedora, Arch, Alpine, openSUSE):
+- **Google Gemini / Antigravity CLI** (`agy` & `gemini`)
+- **Anthropic Claude Code CLI** (`claude`)
+- **GitHub Copilot CLI** (`copilot` & `github-copilot`)
+
+### Instalasi Cepat via curl (Satu Baris):
+```bash
+# Mode Interaktif (Pilih paket di layar):
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh | bash
+
+# Atau Pasang Semua Sekaligus:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh | bash -s -- --all
+```
+
+### Opsi Per-Tool:
+```bash
+# Google Gemini / Antigravity CLI saja:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh | bash -s -- --gemini
+
+# Anthropic Claude Code CLI saja:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh | bash -s -- --claude
+
+# GitHub Copilot CLI saja:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh | bash -s -- --copilot
+```
+
+---
+
 ## 🌐 FRP (Fast Reverse Proxy) - Akses Remote & NAT Traversal
 
 Untuk mengakses dashboard AgentAI (9Router, OpenClaw, Hermes, NanoClaw, M365 Router) dari internet ketika server Anda berada di balik **NAT, Wi-Fi rumah, atau firewall tanpa IP publik**, gunakan **FRP** ([github.com/fatedier/frp](https://github.com/fatedier/frp)).
@@ -179,21 +266,31 @@ FRP terdiri atas dua bagian:
 1. **`frps` (Server)**: Dipasang di VPS publik (AWS EC2, DigitalOcean, Linode, dll.).
 2. **`frpc` (Client)**: Dipasang di server lokal / PC AgentAI Anda.
 
-### 1. Instalasi Otomatis via Script (`install-frp.sh`)
+### 1. Instalasi Otomatis via curl atau Script (`install-frp.sh`)
 
-Script [install-frp.sh](file:///home/andi/script/poc-aws/agentai/install-frp.sh) otomatis mendeteksi arsitektur CPU (`amd64`, `arm64`, `arm`), mengunduh binary resmi terbaru, mengonfigurasi file TOML, dan memasang systemd service auto-start.
+Script `install-frp.sh` otomatis mendeteksi arsitektur CPU (`amd64`, `arm64`, `arm`), mengunduh binary resmi terbaru, mengonfigurasi file TOML, dan memasang systemd service auto-start.
 
 #### A. Pada VPS Publik (FRP Server):
+Anda dapat menginstall langsung di VPS via curl tanpa perlu meng-clone seluruh repo:
 ```bash
-./install-frp.sh server --token "TOKEN_RAHASIA_ANDA"
+# Mode Interaktif:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash
+
+# Atau Satu Baris Otomatis:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- server --token "TOKEN_RAHASIA_ANDA"
 ```
 - Port Tunnel: `7000`
 - Web Dashboard Monitoring: `http://IP-VPS:7500` (User: `admin` / Pass: `admin123456`)
 
 #### B. Pada Server Lokal AgentAI (FRP Client):
 ```bash
-./install-frp.sh client --server-addr "IP_VPS_ANDA" --token "TOKEN_RAHASIA_ANDA"
+# Mode Interaktif:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash
+
+# Atau Satu Baris Otomatis:
+curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- client --server-addr "IP_VPS_ANDA" --token "TOKEN_RAHASIA_ANDA"
 ```
+*(Atau gunakan `./install-frp.sh` jika Anda sudah berada di folder repo)*
 Setelah aktif, seluruh service AgentAI otomatis dipetakan ke IP VPS Anda:
 - **9Router**: `http://IP_VPS:20128`
 - **OpenClaw**: `http://IP_VPS:18789`

@@ -4,6 +4,7 @@ services:
   # ============================================================================
   # 9Router: AI Gateway & Smart LLM Proxy
   # Multi-provider routing, quota optimization, and fallback gateway
+  # Mendukung routing langsung ke M365 Router (http://host.docker.internal:5365/v1)
   # ============================================================================
   9router:
     image: decolua/9router:latest
@@ -37,6 +38,7 @@ services:
 
   # ============================================================================
   # OpenClaw: Full-Featured Autonomous AI Assistant & Automation Gateway
+  # Terintegrasi dengan Andi Pangeran M365 Copilot Agent CLI
   # ============================================================================
   openclaw:
     image: ghcr.io/openclaw/openclaw:latest
@@ -55,6 +57,8 @@ services:
       - LOG_LEVEL=${OPENCLAW_LOG_LEVEL:-info}
     volumes:
       - ./data/openclaw:/home/node/.openclaw
+      - ${HOME:-/root}/.config/m365-copilot-cli:/home/node/.config/m365-copilot-cli:ro
+      - ./m365-agent-cli:/opt/m365-agent-cli:ro
     depends_on:
       - 9router
     networks:
@@ -62,6 +66,7 @@ services:
 
   # ============================================================================
   # Hermes Agent (Nous Research): Self-Improving Autonomous Agent
+  # Terintegrasi dengan Andi Pangeran M365 Copilot Agent CLI
   # ============================================================================
   hermes:
     image: nousresearch/hermes-agent:latest
@@ -83,6 +88,8 @@ services:
       - HERMES_WRITE_SAFE_ROOT=/opt/data
     volumes:
       - ./data/hermes:/opt/data
+      - ${HOME:-/root}/.config/m365-copilot-cli:/root/.config/m365-copilot-cli:ro
+      - ./m365-agent-cli:/opt/m365-agent-cli:ro
     depends_on:
       - 9router
     networks:
@@ -90,6 +97,7 @@ services:
 
   # ============================================================================
   # NanoClaw: Lightweight, Secure, Containerized Personal Agent
+  # Terintegrasi dengan Andi Pangeran M365 Copilot Agent CLI
   # ============================================================================
   nanoclaw:
     build:
@@ -111,6 +119,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-router-key}
     volumes:
       - ./data/nanoclaw:/app/data
+      - ${HOME:-/root}/.config/m365-copilot-cli:/root/.config/m365-copilot-cli:ro
+      - ./m365-agent-cli:/opt/m365-agent-cli:ro
     depends_on:
       - 9router
     networks:

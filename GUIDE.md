@@ -219,14 +219,19 @@ Sekarang, saat **Hermes Agent** atau **OpenClaw** mengirimkan prompt ke 9Router 
 
 | Tugas | Perintah |
 | :--- | :--- |
-| **Install di Host/PC baru** | `./install.sh` |
+| **Check & Auto-Install Docker/Compose** | `./check-docker.sh` |
+| **Install via curl (Pilih Menu)** | `curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh \| bash` |
+| **Install di Host/PC lokal** | `./install.sh` |
+| **Install AI CLIs (Gemini/Claude/Copilot)** | `curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh \| bash` / `./install-ai-clis.sh` |
+| **Login M365 Copilot (Andi Pangeran)** | `m365 login` |
+| **Install FRP Server/Client via curl** | `curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh \| bash` |
+| **Install & Setup FRP (lokal)** | `./install-frp.sh` |
 | **Menjalankan seluruh stack** | `./start.sh` |
 | **Mengecek status & RAM/CPU** | `./status.sh` |
 | **Melihat log real-time** | `docker compose logs -f [service_name]` |
 | **Restart satu service** | `docker compose restart [9router/hermes/openclaw/nanoclaw]` |
 | **Stop stack (data aman)** | `./destroy.sh` |
 | **Reset total beserta data** | `./destroy.sh --volumes` |
-| **Install & Setup FRP (Reverse Proxy)** | `./install-frp.sh` |
 
 ---
 

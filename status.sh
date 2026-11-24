@@ -54,6 +54,25 @@ if [ "$FRP_FOUND" = false ]; then
     echo -e "  - FRP Status      : ${YELLOW}Belum aktif / belum diinstall${RESET} (Jalankan: ${BOLD}./install-frp.sh${RESET})"
 fi
 
+# Cek status Andi Pangeran M365 Copilot Agent CLI
+echo ""
+echo -e "${BOLD}M365 Copilot Agent CLI (Andi Pangeran) Status:${RESET}"
+if command -v m365 >/dev/null 2>&1; then
+    M365_CFG="${HOME}/.config/m365-copilot-cli"
+    if [ -f "${M365_CFG}/storage-state.json" ] && grep -q "microsoft" "${M365_CFG}/storage-state.json" 2>/dev/null; then
+        echo -e "  - Status CLI      : ${GREEN}Installed & Logged In${RESET}"
+    else
+        echo -e "  - Status CLI      : ${YELLOW}Installed, Belum Login${RESET} (Tinggal jalankan: ${BOLD}m365 login${RESET})"
+    fi
+    if curl -s --max-time 1 http://127.0.0.1:5365/v1/models >/dev/null 2>&1; then
+        echo -e "  - Router API (:5365) : ${GREEN}Active / Running${RESET} (http://localhost:5365/v1)"
+    else
+        echo -e "  - Router API (:5365) : ${YELLOW}Not Running${RESET} (Jalankan: ${BOLD}m365 router${RESET})"
+    fi
+else
+    echo -e "  - Status CLI      : ${YELLOW}Belum terpasang${RESET} (Otomatis dipasang saat ./start.sh)"
+fi
+
 echo ""
 echo -e "${BOLD}Resource Usage:${RESET}"
 docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}" 9router openclaw hermes-agent nanoclaw 2>/dev/null || true

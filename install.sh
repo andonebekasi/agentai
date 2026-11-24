@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # AgentAI Stack - Universal Linux Installer
-# Memeriksa & menginstall:
-#   1. Docker Engine + Docker Compose (v2) di semua distro Linux
-#   2. Andi Pangeran M365 Copilot Agent CLI (m365) + Playwright & Cloudflared
-#   3. FRP (Fast Reverse Proxy) Client / Server untuk NAT Traversal & Remote Access
-#   4. AgentAI Stack (9Router + Hermes + OpenClaw + NanoClaw)
+# Repository: https://github.com/andonebekasi/agentai
+#
+# Mendukung instalasi via curl:
+#   curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash
+#
+# Memeriksa & menginstall secara modular / interaktif:
+#   1. Full AgentAI Stack (Docker + Compose + AgentAI Stack + M365 CLI)
+#   2. Docker Engine + Docker Compose (v2) saja
+#   3. AgentAI Stack (9Router + Hermes + OpenClaw + NanoClaw)
+#   4. Andi Pangeran M365 Copilot Agent CLI (m365) + Playwright & Cloudflared
+#   5. FRP Client (frpc) untuk NAT Traversal ke VPS
+#   6. FRP Server (frps) untuk VPS ber-IP publik
 # ==============================================================================
 
 set -euo pipefail
+
+# Hubungkan kembali input terminal jika dijalankan melalui pipe (curl ... | bash)
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+    exec < /dev/tty
+fi
 
 # ANSI Color codes
 BOLD="\033[1m"
@@ -19,23 +31,125 @@ CYAN="\033[0;36m"
 RED="\033[0;31m"
 RESET="\033[0m"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+REPO_URL="https://github.com/andonebekasi/agentai.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "$PWD")"
 
-echo -e "${CYAN}${BOLD}"
-echo "======================================================================"
-echo "    AgentAI & M365 Agent CLI Universal Installer (All Linux Distros) "
-echo "======================================================================"
-echo -e "${RESET}"
+ACTION=""
+FRP_SERVER_ADDR=""
+FRP_AUTH_TOKEN=""
+FRP_SERVER_PORT="7000"
+
+print_banner() {
+    echo -e "${CYAN}${BOLD}"
+    echo "======================================================================"
+    echo "    AgentAI & M365 Agent CLI Universal Installer (All Linux Distros) "
+    echo "             https://github.com/andonebekasi/agentai"
+    echo "======================================================================"
+    echo -e "${RESET}"
+}
+
+usage() {
+    echo "Penggunaan: ./install.sh [opsi]"
+    echo ""
+    echo "Pilihan Komponen Langsung:"
+    echo "  --all, -a                    Install Semua (Auto-Install Docker + OpenClaw/Hermes/NanoClaw/9Router + M365 CLI)"
+    echo "  --stack, -s                  Jalankan AgentAI Stack (OpenClaw, Hermes, NanoClaw, 9Router) + Auto M365 CLI"
+    echo "  --docker, -d                 Auto-Check & Install Docker Engine & Docker Compose (v2) saja"
+    echo "  --m365, -m                   Install Andi Pangeran M365 Copilot Agent CLI saja (Tinggal Login Email M365)"
+    echo "  --ai-clis                    Install Gemini/AGY, Claude Code, dan GitHub Copilot CLI"
+    echo "  --frp-client                 Install & Konfigurasi FRP Client (frpc) untuk AgentAI lokal"
+    echo "  --frp-server                 Install & Konfigurasi FRP Server (frps) untuk VPS publik"
+    echo "  --frp-both                   Install FRP Client & Server sekaligus"
+    echo "  --uninstall-frp              Copot instalasi FRP dari sistem"
+    echo ""
+    echo "Opsi Tambahan untuk FRP:"
+    echo "  --server-addr <ip/domain>    Alamat IP publik VPS (untuk FRP client)"
+    echo "  --token <secret_token>       Token autentikasi rahasia FRP"
+    echo "  --server-port <port>         Port FRP server (default: 7000)"
+    echo "  -h, --help                   Tampilkan panduan ini"
+    echo ""
+    echo "Contoh Penggunaan via curl:"
+    echo "  # Mode Interaktif (Pilih paket yang ingin diinstall):"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash"
+    echo ""
+    echo "  # Pasang Full AgentAI Stack otomatis:"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash -s -- --all"
+    echo ""
+    echo "  # Pasang Semua AI CLIs (Gemini/AGY + Claude + Copilot):"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install.sh | bash -s -- --ai-clis"
+    exit 0
+}
 
 # ------------------------------------------------------------------------------
-# 1. Deteksi Hak Akses (Root / Sudo)
+# 1. Parsing Arguments
+# ------------------------------------------------------------------------------
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --all|-a|all)
+            ACTION="all"
+            shift
+            ;;
+        --docker|-d|docker)
+            ACTION="docker"
+            shift
+            ;;
+        --stack|-s|stack)
+            ACTION="stack"
+            shift
+            ;;
+        --m365|-m|m365)
+            ACTION="m365"
+            shift
+            ;;
+        --ai-clis|ai-clis)
+            ACTION="ai-clis"
+            shift
+            ;;
+        --frp-client|frp-client)
+            ACTION="frp-client"
+            shift
+            ;;
+        --frp-server|frp-server)
+            ACTION="frp-server"
+            shift
+            ;;
+        --frp-both|frp-both)
+            ACTION="frp-both"
+            shift
+            ;;
+        --uninstall-frp)
+            ACTION="uninstall-frp"
+            shift
+            ;;
+        --server-addr)
+            FRP_SERVER_ADDR="$2"
+            shift 2
+            ;;
+        --token)
+            FRP_AUTH_TOKEN="$2"
+            shift 2
+            ;;
+        --server-port)
+            FRP_SERVER_PORT="$2"
+            shift 2
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo -e "${RED}[ERROR] Opsi tidak dikenal: $1${RESET}"
+            usage
+            ;;
+    esac
+done
+
+# ------------------------------------------------------------------------------
+# 2. Deteksi Hak Akses (Root / Sudo)
 # ------------------------------------------------------------------------------
 SUDO=""
 if [ "$(id -u)" -ne 0 ]; then
     if command -v sudo >/dev/null 2>&1; then
         SUDO="sudo"
-        echo -e "${BLUE}[INFO] Script dijalankan sebagai non-root. Menggunakan sudo untuk instalasi sistem.${RESET}"
     else
         echo -e "${RED}[ERROR] Script ini memerlukan akses root atau sudo untuk menginstall dependensi sistem.${RESET}"
         exit 1
@@ -45,7 +159,7 @@ fi
 REAL_USER="${SUDO_USER:-$USER}"
 
 # ------------------------------------------------------------------------------
-# 2. Deteksi Distro Linux
+# 3. Deteksi Distro Linux
 # ------------------------------------------------------------------------------
 detect_distro() {
     if [ -f /etc/os-release ]; then
@@ -61,16 +175,57 @@ detect_distro() {
 }
 
 # ------------------------------------------------------------------------------
-# 3. Instalasi Docker Engine & Compose
+# 4. Memastikan Git Terpasang & Menyiapkan Repository Jika Run via curl
+# ------------------------------------------------------------------------------
+ensure_git_installed() {
+    if ! command -v git >/dev/null 2>&1; then
+        echo -e "${BLUE}[INFO] Menginstall git...${RESET}"
+        if command -v apt-get >/dev/null 2>&1; then
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq git
+        elif command -v dnf >/dev/null 2>&1; then
+            $SUDO dnf install -y git
+        elif command -v yum >/dev/null 2>&1; then
+            $SUDO yum install -y git
+        elif command -v pacman >/dev/null 2>&1; then
+            $SUDO pacman -Sy --noconfirm git
+        elif command -v zypper >/dev/null 2>&1; then
+            $SUDO zypper install -y git
+        elif command -v apk >/dev/null 2>&1; then
+            $SUDO apk add --no-cache git
+        fi
+    fi
+}
+
+ensure_repo_present() {
+    if [ -f "${SCRIPT_DIR}/docker-compose.yml" ] && [ -d "${SCRIPT_DIR}/m365-agent-cli" ]; then
+        cd "${SCRIPT_DIR}"
+        return 0
+    fi
+
+    # Jika script dijalankan dari curl dan belum berada di dalam direktori repository
+    echo -e "${YELLOW}[SETUP] Script dijalankan di luar folder repository AgentAI.${RESET}"
+    TARGET_DIR="${PWD}/agentai"
+    if [ ! -d "$TARGET_DIR" ]; then
+        ensure_git_installed
+        echo -e "${BLUE}[INFO] Meng-clone repository dari ${REPO_URL} ke ${TARGET_DIR}...${RESET}"
+        git clone "$REPO_URL" "$TARGET_DIR"
+    fi
+    cd "$TARGET_DIR"
+    SCRIPT_DIR="$TARGET_DIR"
+    echo -e "${GREEN}✓ Menggunakan direktori repository: ${SCRIPT_DIR}${RESET}"
+}
+
+# ------------------------------------------------------------------------------
+# 5. Instalasi Docker Engine & Compose
 # ------------------------------------------------------------------------------
 install_docker() {
-    echo -e "${YELLOW}[SETUP] Memulai proses instalasi Docker untuk distro '${DISTRO_ID}'...${RESET}"
+    detect_distro
+    echo -e "${YELLOW}[SETUP] Memeriksa & menginstall Docker untuk distro '${DISTRO_ID}'...${RESET}"
 
-    # Pastikan curl/ca-certificates tersedia
     if ! command -v curl >/dev/null 2>&1; then
-        echo -e "${BLUE}[INFO] Menginstall curl...${RESET}"
+        echo -e "${BLUE}[INFO] Menginstall curl & ca-certificates...${RESET}"
         if command -v apt-get >/dev/null 2>&1; then
-            $SUDO apt-get update && $SUDO apt-get install -y curl ca-certificates
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq curl ca-certificates
         elif command -v dnf >/dev/null 2>&1; then
             $SUDO dnf install -y curl ca-certificates
         elif command -v yum >/dev/null 2>&1; then
@@ -84,7 +239,6 @@ install_docker() {
         fi
     fi
 
-    # Distro-specific installation logic
     case "${DISTRO_ID}" in
         arch|manjaro|endeavouros)
             echo -e "${BLUE}[INFO] Menginstall Docker via pacman...${RESET}"
@@ -97,13 +251,12 @@ install_docker() {
             ;;
 
         *)
-            # Untuk Debian, Ubuntu, Linux Mint, Pop!_OS, CentOS, RHEL, Fedora, Rocky, AlmaLinux, SLES, openSUSE:
             echo -e "${BLUE}[INFO] Menjalankan script instalasi resmi Docker (get.docker.com)...${RESET}"
             if curl -fsSL https://get.docker.com -o /tmp/get-docker.sh; then
                 $SUDO sh /tmp/get-docker.sh
                 rm -f /tmp/get-docker.sh
             else
-                echo -e "${YELLOW}[WARN] Gagal mengunduh get.docker.com. Mencoba metode package manager lokal...${RESET}"
+                echo -e "${YELLOW}[WARN] Gagal mengunduh get.docker.com. Mencoba metode package manager...${RESET}"
                 if command -v apt-get >/dev/null 2>&1; then
                     $SUDO apt-get update
                     $SUDO apt-get install -y docker.io docker-compose-plugin || $SUDO apt-get install -y docker.io docker-compose
@@ -116,7 +269,6 @@ install_docker() {
             ;;
     esac
 
-    # Memastikan service Docker berjalan dan aktif saat boot
     echo -e "${BLUE}[INFO] Mengaktifkan service Docker daemon...${RESET}"
     if command -v systemctl >/dev/null 2>&1; then
         $SUDO systemctl daemon-reload || true
@@ -129,16 +281,12 @@ install_docker() {
         $SUDO service docker start || true
     fi
 
-    # Menambahkan user ke group docker agar tidak selalu butuh sudo
     if [ -n "${REAL_USER}" ] && [ "${REAL_USER}" != "root" ]; then
         echo -e "${BLUE}[INFO] Menambahkan user '${REAL_USER}' ke grup 'docker'...${RESET}"
         $SUDO usermod -aG docker "${REAL_USER}" || true
     fi
 }
 
-# ------------------------------------------------------------------------------
-# 4. Instalasi Docker Compose Plugin (Jika belum ada)
-# ------------------------------------------------------------------------------
 install_docker_compose_standalone() {
     echo -e "${YELLOW}[SETUP] Menginstall Docker Compose v2 standalone plugin...${RESET}"
     ARCH="$(uname -m)"
@@ -152,7 +300,7 @@ install_docker_compose_standalone() {
     CLI_PLUGINS_DIR="/usr/local/lib/docker/cli-plugins"
     $SUDO mkdir -p "$CLI_PLUGINS_DIR"
     
-    echo -e "${BLUE}[INFO] Mengunduh binary Docker Compose untuk arsitektur ${COMPOSE_ARCH}...${RESET}"
+    echo -e "${BLUE}[INFO] Mengunduh binary Docker Compose (${COMPOSE_ARCH})...${RESET}"
     if curl -fsSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-${COMPOSE_ARCH}" -o /tmp/docker-compose; then
         $SUDO mv /tmp/docker-compose "${CLI_PLUGINS_DIR}/docker-compose"
         $SUDO chmod +x "${CLI_PLUGINS_DIR}/docker-compose"
@@ -164,150 +312,292 @@ install_docker_compose_standalone() {
     fi
 }
 
+ensure_docker_and_compose() {
+    if [ -f "${SCRIPT_DIR}/check-docker.sh" ]; then
+        chmod +x "${SCRIPT_DIR}/check-docker.sh"
+        "${SCRIPT_DIR}/check-docker.sh"
+        return 0
+    fi
+
+    if ! command -v docker >/dev/null 2>&1; then
+        echo -e "${YELLOW}! Docker Engine belum terpasang.${RESET}"
+        install_docker
+    else
+        echo -e "${GREEN}✓ Docker Engine sudah terpasang: $(docker --version)${RESET}"
+        if ! docker info >/dev/null 2>&1; then
+            echo -e "${YELLOW}! Service Docker belum berjalan. Menyalakan service...${RESET}"
+            if command -v systemctl >/dev/null 2>&1; then
+                $SUDO systemctl enable --now docker || true
+            elif command -v service >/dev/null 2>&1; then
+                $SUDO service docker start || true
+            fi
+        fi
+    fi
+
+    if docker compose version >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Docker Compose (v2) sudah siap: $(docker compose version)${RESET}"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Docker Compose standalone terdeteksi: $(docker-compose --version)${RESET}"
+    else
+        echo -e "${YELLOW}! Docker Compose (v2) belum terpasang.${RESET}"
+        install_docker_compose_standalone
+    fi
+}
+
 # ------------------------------------------------------------------------------
-# 5. Instalasi M365 Copilot Agent CLI (m365)
+# 6. Instalasi M365 Copilot Agent CLI (m365)
 # ------------------------------------------------------------------------------
 install_m365_agent_cli() {
+    ensure_repo_present
     echo ""
     echo -e "${CYAN}${BOLD}[M365 AGENT CLI] Memeriksa instalasi Andi Pangeran M365 Copilot Agent CLI...${RESET}"
     
     if command -v m365 >/dev/null 2>&1; then
         echo -e "${GREEN}✓ M365 Copilot Agent CLI sudah terpasang: $(m365 --version 2>/dev/null || echo 'terpasang')${RESET}"
-        return 0
-    fi
-
-    if [ -d "${SCRIPT_DIR}/m365-agent-cli" ] && [ -f "${SCRIPT_DIR}/m365-agent-cli/install.sh" ]; then
-        echo -e "${YELLOW}[SETUP] Memasang M365 Copilot Agent CLI dari direktori lokal...${RESET}"
-        chmod +x "${SCRIPT_DIR}/m365-agent-cli/install.sh"
-        chmod +x "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js"
-        
-        # Jalankan installer m365-agent-cli
-        (cd "${SCRIPT_DIR}/m365-agent-cli" && ./install.sh --global --in-place || ./install.sh --in-place)
-        
-        # Buat symlink fallback jika belum ada
-        if ! command -v m365 >/dev/null 2>&1; then
+    else
+        if [ -d "${SCRIPT_DIR}/m365-agent-cli" ] && [ -f "${SCRIPT_DIR}/m365-agent-cli/install.sh" ]; then
+            echo -e "${YELLOW}[SETUP] Memasang Andi Pangeran M365 Copilot Agent CLI...${RESET}"
+            chmod +x "${SCRIPT_DIR}/m365-agent-cli/install.sh"
+            chmod +x "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js"
+            
+            (cd "${SCRIPT_DIR}/m365-agent-cli" && ./install.sh --global --in-place 2>/dev/null || ./install.sh --in-place)
+            
             mkdir -p "${HOME}/.local/bin"
             ln -sf "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js" "${HOME}/.local/bin/m365"
             ln -sf "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js" "${HOME}/.local/bin/m365-copilot"
             if [ -n "$SUDO" ]; then
-                $SUDO ln -sf "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js" /usr/local/bin/m365 || true
-                $SUDO ln -sf "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js" /usr/local/bin/m365-copilot || true
+                $SUDO ln -sf "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js" /usr/local/bin/m365 2>/dev/null || true
+                $SUDO ln -sf "${SCRIPT_DIR}/m365-agent-cli/bin/m365.js" /usr/local/bin/m365-copilot 2>/dev/null || true
             fi
+            echo -e "${GREEN}✓ M365 Copilot Agent CLI berhasil dipasang.${RESET}"
+        else
+            echo -e "${YELLOW}[WARN] Direktori m365-agent-cli tidak ditemukan.${RESET}"
         fi
-        echo -e "${GREEN}✓ M365 Copilot Agent CLI berhasil dipasang.${RESET}"
-    else
-        echo -e "${YELLOW}[WARN] Direktori m365-agent-cli tidak ditemukan. Melewati langkah ini.${RESET}"
+    fi
+
+    # Buat direktori konfigurasi m365
+    mkdir -p "${HOME}/.config/m365-copilot-cli"
+
+    # Periksa status login
+    M365_CONFIG="${HOME}/.config/m365-copilot-cli/storage-state.json"
+    if [ ! -f "$M365_CONFIG" ] || ! grep -q "microsoft" "$M365_CONFIG" 2>/dev/null; then
+        echo ""
+        echo -e "${YELLOW}----------------------------------------------------------------------${RESET}"
+        echo -e "${YELLOW}${BOLD}[LANGKAH SELANJUTNYA - LOGIN EMAIL M365]${RESET}"
+        echo -e "M365 CLI (Andi Pangeran) telah siap. Anda tinggal login dengan email M365:"
+        echo -e "    ${CYAN}${BOLD}m365 login${RESET}"
+        echo -e "(Setelah login, Copilot otomatis dapat digunakan oleh 9Router, Hermes & OpenClaw!)"
+        echo -e "${YELLOW}----------------------------------------------------------------------${RESET}"
     fi
 }
 
 # ------------------------------------------------------------------------------
-# 5b. Instalasi FRP (Fast Reverse Proxy) - Opsional / Remote Access
+# 7. Eksekusi FRP Installer
 # ------------------------------------------------------------------------------
-install_frp_interactive() {
-    echo ""
-    echo -e "${CYAN}${BOLD}[FRP REVERSE PROXY] Pengecekan Fast Reverse Proxy (frp)...${RESET}"
-    if command -v frpc >/dev/null 2>&1 || command -v frps >/dev/null 2>&1; then
-        echo -e "${GREEN}✓ FRP binary sudah terpasang: $(frpc -v 2>/dev/null || frps -v 2>/dev/null || echo 'terpasang')${RESET}"
-        return 0
-    fi
+run_frp_installer() {
+    local frp_role="$1"
+    shift || true
 
+    local frp_cmd=()
     if [ -f "${SCRIPT_DIR}/install-frp.sh" ]; then
         chmod +x "${SCRIPT_DIR}/install-frp.sh"
+        frp_cmd=("${SCRIPT_DIR}/install-frp.sh")
+    else
+        ensure_git_installed
+        echo -e "${BLUE}[INFO] Mengunduh script install-frp.sh dari repository...${RESET}"
+        curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh -o /tmp/install-frp.sh
+        chmod +x /tmp/install-frp.sh
+        frp_cmd=("/tmp/install-frp.sh")
+    fi
+
+    if [ -n "$frp_role" ]; then
+        frp_cmd+=("$frp_role")
+    fi
+
+    if [ -n "$FRP_SERVER_ADDR" ]; then
+        frp_cmd+=(--server-addr "$FRP_SERVER_ADDR")
+    fi
+    if [ -n "$FRP_AUTH_TOKEN" ]; then
+        frp_cmd+=(--token "$FRP_AUTH_TOKEN")
+    fi
+    if [ -n "$FRP_SERVER_PORT" ]; then
+        frp_cmd+=(--server-port "$FRP_SERVER_PORT")
+    fi
+
+    "${frp_cmd[@]}" "$@"
+}
+
+# ------------------------------------------------------------------------------
+# 8. Menjalankan AgentAI Stack
+# ------------------------------------------------------------------------------
+start_agentai_stack() {
+    ensure_repo_present
+    ensure_docker_and_compose
+    install_m365_agent_cli
+
+    echo ""
+    echo -e "${BLUE}[STEP] Menyiapkan hak akses script start.sh, destroy.sh, status.sh, check-docker.sh...${RESET}"
+    chmod +x start.sh destroy.sh status.sh check-docker.sh docker/nanoclaw/entrypoint.sh 2>/dev/null || true
+    if [ -f "${SCRIPT_DIR}/install-frp.sh" ]; then
+        chmod +x "${SCRIPT_DIR}/install-frp.sh"
+    fi
+
+    echo -e "${CYAN}[LAUNCH] Memulai AgentAI stack melalui ./start.sh...${RESET}"
+    ./start.sh
+}
+
+# ------------------------------------------------------------------------------
+# 9. Menu Interaktif (Bisa Pilih Mau Apa)
+# ------------------------------------------------------------------------------
+print_banner
+
+if [ -z "$ACTION" ]; then
+    if [ -t 0 ]; then
+        echo -e "${BOLD}Silakan pilih paket instalasi yang Anda inginkan:${RESET}"
+        echo -e "  ${CYAN}1) [All-in-One Lengkap] OpenClaw + Hermes + NanoClaw + 9Router${RESET}  ${GREEN}[Rekomendasi]${RESET}"
+        echo -e "     ${YELLOW}• Auto-Check & Auto-Install Docker Engine + Compose (jika belum ada)${RESET}"
+        echo -e "     ${YELLOW}• Auto-Install Andi Pangeran M365 Copilot Agent CLI (Tinggal Login Email M365)${RESET}"
+        echo -e "     ${YELLOW}• Opsi konfigurasi FRP Reverse Proxy Client ke VPS${RESET}"
+        echo ""
+        echo -e "  ${CYAN}2) [AgentAI Stack Saja] OpenClaw + Hermes + NanoClaw + 9Router${RESET}"
+        echo -e "     ${YELLOW}• Auto-Check/Install Docker + Auto-Install M365 CLI (Tinggal Login Email M365)${RESET}"
+        echo ""
+        echo -e "  ${CYAN}3) [Docker Saja] Auto-Check & Install Docker Engine & Compose (v2)${RESET}"
+        echo -e "     ${YELLOW}• Menjalankan check-docker.sh untuk semua distro Linux${RESET}"
+        echo ""
+        echo -e "  ${CYAN}4) [M365 CLI Saja] Andi Pangeran M365 Copilot Agent CLI${RESET}"
+        echo -e "     ${YELLOW}• CLI Agent Linux + AI Router Port 5365 (Tinggal Login Email M365: m365 login)${RESET}"
+        echo ""
+        echo -e "  ${CYAN}5) [FRP Client] Fast Reverse Proxy Client (frpc)${RESET}"
+        echo -e "     ${YELLOW}• Ekspos 9Router, OpenClaw, Hermes, NanoClaw, M365 dari balik NAT/WiFi ke VPS${RESET}"
+        echo ""
+        echo -e "  ${CYAN}6) [FRP Server] Fast Reverse Proxy Server (frps)${RESET}"
+        echo -e "     ${YELLOW}• Pasang di VPS Publik untuk Tunnel & Web Dashboard Monitoring Port 7500${RESET}"
+        echo ""
+        echo -e "  ${CYAN}7) [FRP Keduanya] Pasang FRP Client & Server sekaligus di mesin ini${RESET}"
+        echo ""
+        echo -e "  ${YELLOW}8) [Uninstall FRP] Copot service & binary FRP dari sistem${RESET}"
+        echo ""
+        echo -e "  ${CYAN}9) [AI CLIs] Install Gemini/AGY + Claude Code + GitHub Copilot CLI${RESET}"
+        echo -e "     ${YELLOW}• Google Antigravity/Gemini (agy), Anthropic Claude (claude), GitHub Copilot (copilot)${RESET}"
+        echo ""
+        echo -e "  ${RED}10) Keluar / Exit${RESET}"
+        echo ""
+        read -r -p "Masukkan nomor pilihan [1-10] (default: 1): " user_choice
+        case "${user_choice:-1}" in
+            1) ACTION="all" ;;
+            2) ACTION="stack" ;;
+            3) ACTION="docker" ;;
+            4) ACTION="m365" ;;
+            5) ACTION="frp-client" ;;
+            6) ACTION="frp-server" ;;
+            7) ACTION="frp-both" ;;
+            8) ACTION="uninstall-frp" ;;
+            9) ACTION="ai-clis" ;;
+            *) echo "Instalasi dibatalkan."; exit 0 ;;
+        esac
+    else
+        ACTION="all"
+    fi
+fi
+
+# ------------------------------------------------------------------------------
+# 10. Eksekusi Berdasarkan Pilihan
+# ------------------------------------------------------------------------------
+case "$ACTION" in
+    docker)
+        ensure_docker_and_compose
+        echo -e "${GREEN}✓ Instalasi Docker & Compose selesai!${RESET}"
+        ;;
+
+    m365)
+        install_m365_agent_cli
+        echo -e "${GREEN}✓ Instalasi M365 Copilot Agent CLI selesai! Ketik: ${BOLD}m365 --help${RESET}"
+        ;;
+
+    stack)
+        start_agentai_stack
+        ;;
+
+    frp-client)
+        run_frp_installer "client"
+        ;;
+
+    frp-server)
+        run_frp_installer "server"
+        ;;
+
+    frp-both)
+        run_frp_installer "both"
+        ;;
+
+    ai-clis)
+        if [ -f "${SCRIPT_DIR}/install-ai-clis.sh" ]; then
+            chmod +x "${SCRIPT_DIR}/install-ai-clis.sh"
+            "${SCRIPT_DIR}/install-ai-clis.sh" --all
+        else
+            curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-ai-clis.sh | bash -s -- --all
+        fi
+        ;;
+
+    uninstall-frp)
+        run_frp_installer "" --uninstall
+        ;;
+
+    all)
+        ensure_repo_present
+        ensure_docker_and_compose
+        install_m365_agent_cli
+
+        # Pertanyaan instalasi FRP opsional jika interaktif
         INSTALL_FRP=false
         if [ -t 0 ]; then
-            echo -e "${YELLOW}FRP (Fast Reverse Proxy) memungkinkan Anda mengekspos AgentAI (9Router, OpenClaw, Hermes, dll.)${RESET}"
-            echo -e "${YELLOW}dari server lokal/PC di balik NAT/WiFi ke Internet melalui VPS publik.${RESET}"
-            read -r -p "Apakah Anda ingin menginstall & konfigurasi FRP sekarang? [y/N]: " frp_choice
-            case "$frp_choice" in
-                [yY][eE][sS]|[yY])
-                    INSTALL_FRP=true
+            echo ""
+            echo -e "${CYAN}${BOLD}[FRP REVERSE PROXY] Pengecekan Fast Reverse Proxy (frp)...${RESET}"
+            if ! command -v frpc >/dev/null 2>&1; then
+                echo -e "${YELLOW}FRP memungkinkan Anda mengakses 9Router, Hermes, OpenClaw, dan M365 Router${RESET}"
+                echo -e "${YELLOW}dari internet via VPS publik ketika server Anda di balik WiFi / NAT.${RESET}"
+                read -r -p "Apakah Anda ingin menginstall & konfigurasi FRP Client sekarang? [y/N]: " frp_choice
+                case "$frp_choice" in
+                    [yY][eE][sS]|[yY])
+                        INSTALL_FRP=true
+                        ;;
+                    *)
+                        INSTALL_FRP=false
+                        ;;
+                esac
+            fi
+        fi
+
+        if [ "$INSTALL_FRP" = true ]; then
+            run_frp_installer "client"
+        fi
+
+        echo ""
+        echo -e "${GREEN}✓ Seluruh dependensi host (Docker + Compose + M365 Agent CLI) telah siap!${RESET}"
+
+        # Tanya apakah langsung jalankan stack
+        START_NOW=true
+        if [ -t 0 ]; then
+            read -r -p "Jalankan AgentAI stack (9Router + Hermes + OpenClaw + NanoClaw) sekarang? [Y/n]: " run_now
+            case "$run_now" in
+                [nN][oO]|[nN])
+                    START_NOW=false
                     ;;
                 *)
-                    INSTALL_FRP=false
+                    START_NOW=true
                     ;;
             esac
         fi
 
-        if [ "$INSTALL_FRP" = true ]; then
-            "${SCRIPT_DIR}/install-frp.sh"
+        if [ "$START_NOW" = true ]; then
+            start_agentai_stack
         else
-            echo -e "${BLUE}[INFO] Melewati instalasi FRP. Anda dapat menginstallnya kapan saja dengan: ${BOLD}./install-frp.sh${RESET}"
+            echo -e "${GREEN}Instalasi selesai!${RESET}"
+            echo -e "Untuk menjalankan AgentAI stack kapan saja, ketik:"
+            echo -e "    ${BOLD}./start.sh${RESET}"
+            echo -e "Untuk menggunakan M365 Copilot CLI, ketik:"
+            echo -e "    ${BOLD}m365 --help${RESET}"
         fi
-    fi
-}
-detect_distro
-
-# Cek Docker
-if ! command -v docker >/dev/null 2>&1; then
-    echo -e "${YELLOW}! Docker Engine belum terpasang.${RESET}"
-    install_docker
-else
-    echo -e "${GREEN}✓ Docker Engine sudah terpasang: $(docker --version)${RESET}"
-    if ! docker info >/dev/null 2>&1; then
-        echo -e "${YELLOW}! Service Docker belum berjalan. Mencoba menyalakan service...${RESET}"
-        if command -v systemctl >/dev/null 2>&1; then
-            $SUDO systemctl enable --now docker || true
-        elif command -v service >/dev/null 2>&1; then
-            $SUDO service docker start || true
-        fi
-    fi
-fi
-
-# Cek Docker Compose
-if docker compose version >/dev/null 2>&1; then
-    echo -e "${GREEN}✓ Docker Compose (v2) sudah siap: $(docker compose version)${RESET}"
-elif command -v docker-compose >/dev/null 2>&1; then
-    echo -e "${GREEN}✓ Docker Compose standalone terdeteksi: $(docker-compose --version)${RESET}"
-else
-    echo -e "${YELLOW}! Docker Compose (v2) belum terpasang.${RESET}"
-    install_docker_compose_standalone
-fi
-
-# Cek dan pasang M365 Copilot Agent CLI
-install_m365_agent_cli
-
-# Cek dan pasang FRP (Fast Reverse Proxy)
-install_frp_interactive
-
-# Pastikan permission socket docker dapat diakses
-if ! docker ps >/dev/null 2>&1; then
-    if $SUDO docker ps >/dev/null 2>&1; then
-        echo -e "${YELLOW}[NOTICE] User '${REAL_USER}' telah ditambahkan ke grup docker.${RESET}"
-        echo -e "${YELLOW}Untuk menerapkan izin grup tanpa logout, jalankan: ${BOLD}newgrp docker${RESET}"
-    fi
-fi
-
-# ------------------------------------------------------------------------------
-# 7. Menyiapkan Permissions & Memulai Stack
-# ------------------------------------------------------------------------------
-echo ""
-echo -e "${BLUE}[STEP] Menyiapkan hak akses script start.sh, destroy.sh, status.sh, dan install-frp.sh...${RESET}"
-chmod +x start.sh destroy.sh status.sh install-frp.sh docker/nanoclaw/entrypoint.sh
-
-echo -e "${GREEN}✓ Seluruh dependensi host (Docker + Compose + M365 Agent CLI) telah siap!${RESET}"
-echo ""
-
-# Tanya apakah ingin langsung menjalankan stack sekarang
-START_NOW=true
-if [ -t 0 ]; then
-    read -r -p "Jalankan AgentAI stack (9Router + Hermes + OpenClaw + NanoClaw) sekarang? [Y/n]: " run_now
-    case "$run_now" in
-        [nN][oO]|[nN])
-            START_NOW=false
-            ;;
-        *)
-            START_NOW=true
-            ;;
-    esac
-fi
-
-if [ "$START_NOW" = true ]; then
-    echo -e "${CYAN}[LAUNCH] Memulai stack melalui ./start.sh...${RESET}"
-    ./start.sh
-else
-    echo -e "${GREEN}Instalasi host selesai!${RESET}"
-    echo -e "Untuk menjalankan AgentAI stack kapan saja, ketik:"
-    echo -e "    ${BOLD}./start.sh${RESET}"
-    echo -e "Untuk menggunakan M365 Copilot CLI, ketik:"
-    echo -e "    ${BOLD}m365 --help${RESET}"
-fi
+        ;;
+esac

@@ -2,14 +2,23 @@
 # ==============================================================================
 # FRP (Fast Reverse Proxy) Universal Installer & Configurator
 # https://github.com/fatedier/frp
+# Repository: https://github.com/andonebekasi/agentai
 #
-# Mendukung instalasi pada:
+# Mendukung instalasi via curl:
+#   curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash
+#
+# Peran yang didukung:
 #   1. FRP Client (frpc) -> Host lokal / server di balik NAT (AgentAI machine)
 #   2. FRP Server (frps) -> Host VPS publik dengan IP Publik
 #   3. Keduanya (Client & Server)
 # ==============================================================================
 
 set -euo pipefail
+
+# Hubungkan kembali input terminal jika dijalankan melalui pipe (curl ... | bash)
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+    exec < /dev/tty
+fi
 
 # ANSI Color codes
 BOLD="\033[1m"
@@ -20,7 +29,7 @@ CYAN="\033[0;36m"
 RED="\033[0;31m"
 RESET="\033[0m"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "$PWD")"
 DEFAULT_VERSION="v0.72.0"
 
 # Defaults
@@ -29,6 +38,8 @@ SERVER_ADDR=""
 SERVER_PORT="7000"
 AUTH_TOKEN=""
 DASHBOARD_PORT="7500"
+DASHBOARD_USER="admin"
+DASHBOARD_PASS="admin123456"
 FRP_VERSION=""
 DO_UNINSTALL=false
 
@@ -36,38 +47,43 @@ print_banner() {
     echo -e "${CYAN}${BOLD}"
     echo "======================================================================"
     echo "       FRP (Fast Reverse Proxy) Universal Installer & Setup"
-    echo "               https://github.com/fatedier/frp"
+    echo "             https://github.com/andonebekasi/agentai"
     echo "======================================================================"
     echo -e "${RESET}"
 }
 
 usage() {
-    echo "Usage: ./install-frp.sh [role] [options]"
+    echo "Penggunaan: ./install-frp.sh [role] [opsi]"
     echo ""
     echo "Role:"
-    echo "  client                     Install frpc (Client) untuk mesin AgentAI lokal"
-    echo "  server                     Install frps (Server) untuk VPS ber-IP publik"
-    echo "  both                       Install frpc dan frps sekaligus"
+    echo "  client                       Install frpc (Client) untuk mesin AgentAI lokal"
+    echo "  server                       Install frps (Server) untuk VPS ber-IP publik"
+    echo "  both                         Install frpc dan frps sekaligus"
     echo ""
-    echo "Options:"
+    echo "Opsi:"
     echo "  --role <client|server|both>  Tentukan peran instalasi"
     echo "  --server-addr <ip/domain>    Alamat IP publik atau domain VPS (khusus client)"
     echo "  --server-port <port>         Port FRP server (default: 7000)"
     echo "  --token <secret_token>       Token autentikasi rahasia FRP"
     echo "  --dashboard-port <port>      Port Dashboard Web UI FRP Server (default: 7500)"
+    echo "  --dashboard-user <user>      Username Web UI FRP Server (default: admin)"
+    echo "  --dashboard-pass <pass>      Password Web UI FRP Server (default: admin123456)"
     echo "  --version <vX.Y.Z>           Versi rilis FRP (default: deteksi otomatis / latest)"
     echo "  --uninstall                  Hentikan dan copot instalasi FRP dari sistem"
     echo "  -h, --help                   Tampilkan bantuan ini"
     echo ""
-    echo "Contoh Penggunaan:"
-    echo "  # Install di VPS Publik:"
-    echo "  ./install-frp.sh server --token \"MySecretToken123\""
+    echo "Contoh Penggunaan via curl:"
+    echo "  # Mode Interaktif (Pilih Server / Client):"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash"
     echo ""
-    echo "  # Install di Host AgentAI Lokal:"
-    echo "  ./install-frp.sh client --server-addr \"203.0.113.10\" --token \"MySecretToken123\""
+    echo "  # Pasang di VPS Publik (FRP Server):"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- server --token \"TokenRahasia123\""
     echo ""
-    echo "  # Mode Interaktif:"
-    echo "  ./install-frp.sh"
+    echo "  # Pasang di Host Lokal (FRP Client):"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- client --server-addr \"203.0.113.10\" --token \"TokenRahasia123\""
+    echo ""
+    echo "  # Copot / Uninstall FRP:"
+    echo "  curl -fsSL https://raw.githubusercontent.com/andonebekasi/agentai/main/install-frp.sh | bash -s -- --uninstall"
     exit 0
 }
 
@@ -98,6 +114,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --dashboard-port)
             DASHBOARD_PORT="$2"
+            shift 2
+            ;;
+        --dashboard-user)
+            DASHBOARD_USER="$2"
+            shift 2
+            ;;
+        --dashboard-pass)
+            DASHBOARD_PASS="$2"
             shift 2
             ;;
         --version)
@@ -156,19 +180,36 @@ fi
 print_banner
 
 # ------------------------------------------------------------------------------
-# 4. Mode Interaktif jika argumen belum lengkap
+# 4. Generate Random Token Helper
+# ------------------------------------------------------------------------------
+generate_default_token() {
+    if command -v openssl >/dev/null 2>&1; then
+        echo "agentai_secret_$(openssl rand -hex 6 2>/dev/null)"
+    elif [ -r /dev/urandom ]; then
+        echo "agentai_secret_$(head -c 6 /dev/urandom | xxd -p 2>/dev/null || od -N 6 -t x1 /dev/urandom 2>/dev/null | head -1 | awk '{print $2$3$4$5$6$7}' || echo 'token123456')"
+    else
+        echo "agentai_secret_token123456"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# 5. Mode Interaktif jika argumen belum lengkap
 # ------------------------------------------------------------------------------
 if [ -z "$ROLE" ]; then
     if [ -t 0 ]; then
         echo -e "${BOLD}Pilih peran instalasi FRP untuk server/komputer ini:${RESET}"
-        echo -e "  ${CYAN}1) FRP Client (frpc)${RESET}  -> Untuk mesin AgentAI lokal (di balik NAT / WiFi rumah / intranet)"
-        echo -e "  ${CYAN}2) FRP Server (frps)${RESET}  -> Untuk VPS publik (misal AWS EC2, DigitalOcean, Linode)"
-        echo -e "  ${CYAN}3) Keduanya (Client & Server)${RESET}"
+        echo -e "  ${CYAN}1) FRP Client (frpc)${RESET}        -> Untuk mesin AgentAI lokal (di balik NAT / WiFi rumah / intranet)"
+        echo -e "  ${CYAN}2) FRP Server (frps)${RESET}        -> Untuk VPS publik (misal AWS EC2, DigitalOcean, Linode)"
+        echo -e "  ${CYAN}3) Keduanya (Client & Server)${RESET} -> Pasang frpc & frps sekaligus pada satu mesin"
+        echo -e "  ${YELLOW}4) Copot / Uninstall FRP${RESET}     -> Hentikan service & hapus konfigurasi/binary FRP"
+        echo -e "  ${RED}5) Keluar${RESET}"
         echo ""
-        read -r -p "Masukkan pilihan [1-3] (default: 1): " role_choice
+        read -r -p "Masukkan pilihan [1-5] (default: 1): " role_choice
         case "${role_choice:-1}" in
             2) ROLE="server" ;;
             3) ROLE="both" ;;
+            4) uninstall_frp ;;
+            5) echo "Dibatalkan."; exit 0 ;;
             *) ROLE="client" ;;
         esac
     else
@@ -179,22 +220,56 @@ fi
 if [[ "$ROLE" == "client" || "$ROLE" == "both" ]] && [ -z "$SERVER_ADDR" ]; then
     if [ -t 0 ]; then
         echo ""
-        read -r -p "Masukkan IP Publik atau Domain dari FRP Server VPS (cth: 203.0.113.50): " SERVER_ADDR
+        echo -e "${YELLOW}[SERVER ADDR]${RESET} Masukkan IP Publik atau Domain VPS di mana FRP Server (frps) berjalan."
+        read -r -p "Alamat FRP Server VPS [default: 127.0.0.1]: " user_addr
+        SERVER_ADDR="${user_addr:-127.0.0.1}"
+    else
+        SERVER_ADDR="127.0.0.1"
     fi
-    SERVER_ADDR="${SERVER_ADDR:-127.0.0.1}"
 fi
 
 if [ -z "$AUTH_TOKEN" ]; then
+    DEF_TOKEN="$(generate_default_token)"
     if [ -t 0 ]; then
-        read -r -p "Masukkan secret token autentikasi FRP (enter untuk default): " user_tok
-        AUTH_TOKEN="${user_tok:-agentai_secret_$(openssl rand -hex 6 2>/dev/null || echo 'frp123456')}"
+        echo ""
+        echo -e "${YELLOW}[AUTH TOKEN]${RESET} Token autentikasi harus sama antara FRP Server (VPS) dan FRP Client."
+        read -r -p "Masukkan secret token FRP [Enter untuk gunakan: ${DEF_TOKEN}]: " user_tok
+        AUTH_TOKEN="${user_tok:-$DEF_TOKEN}"
     else
-        AUTH_TOKEN="agentai_secret_token_default"
+        AUTH_TOKEN="$DEF_TOKEN"
     fi
 fi
 
 # ------------------------------------------------------------------------------
-# 5. Deteksi Arsitektur CPU
+# 6. Pastikan Kebutuhan Dependensi Dasar Tersedia (curl & tar)
+# ------------------------------------------------------------------------------
+ensure_dependencies() {
+    local missing=()
+    for cmd in curl tar; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing+=("$cmd")
+        fi
+    done
+    if [ ${#missing[@]} -gt 0 ]; then
+        echo -e "${BLUE}[INFO] Menginstall paket pendukung: ${missing[*]}...${RESET}"
+        if command -v apt-get >/dev/null 2>&1; then
+            $SUDO apt-get update -qq && $SUDO apt-get install -y -qq "${missing[@]}" ca-certificates
+        elif command -v dnf >/dev/null 2>&1; then
+            $SUDO dnf install -y "${missing[@]}" ca-certificates
+        elif command -v yum >/dev/null 2>&1; then
+            $SUDO yum install -y "${missing[@]}" ca-certificates
+        elif command -v pacman >/dev/null 2>&1; then
+            $SUDO pacman -Sy --noconfirm "${missing[@]}" ca-certificates
+        elif command -v zypper >/dev/null 2>&1; then
+            $SUDO zypper install -y "${missing[@]}" ca-certificates
+        elif command -v apk >/dev/null 2>&1; then
+            $SUDO apk add --no-cache "${missing[@]}" ca-certificates
+        fi
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# 7. Deteksi Arsitektur CPU
 # ------------------------------------------------------------------------------
 detect_arch() {
     ARCH_RAW="$(uname -m)"
@@ -219,13 +294,14 @@ detect_arch() {
             exit 1
             ;;
     esac
-    echo -e "${BLUE}[INFO] Arsitektur CPU terdeteksi: ${BOLD}${ARCH_RAW}${RESET} -> mapped ke binary: ${BOLD}linux_${FRP_ARCH}${RESET}"
+    echo -e "${BLUE}[INFO] Arsitektur CPU terdeteksi: ${BOLD}${ARCH_RAW}${RESET} -> binary: ${BOLD}linux_${FRP_ARCH}${RESET}"
 }
 
 # ------------------------------------------------------------------------------
-# 6. Menentukan Versi & Download Binary
+# 8. Menentukan Versi & Download Binary
 # ------------------------------------------------------------------------------
 download_and_install_binaries() {
+    ensure_dependencies
     detect_arch
 
     if [ -z "$FRP_VERSION" ]; then
@@ -260,20 +336,19 @@ download_and_install_binaries() {
     $SUDO install -m 755 "${EXTRACT_DIR}/frpc" /usr/local/bin/frpc
     $SUDO install -m 755 "${EXTRACT_DIR}/frps" /usr/local/bin/frps
     $SUDO mkdir -p /etc/frp
-    mkdir -p "${SCRIPT_DIR}/frp"
 
     echo -e "${GREEN}✓ Binary /usr/local/bin/frpc dan /usr/local/bin/frps berhasil dipasang.${RESET}"
     echo -e "  Versi: $(/usr/local/bin/frpc -v 2>/dev/null || echo "$FRP_VERSION")"
 }
 
 # ------------------------------------------------------------------------------
-# 7. Konfigurasi FRP Client (frpc)
+# 9. Konfigurasi FRP Client (frpc)
 # ------------------------------------------------------------------------------
 setup_frp_client() {
     echo ""
     echo -e "${CYAN}${BOLD}[CONFIG] Mengonfigurasi FRP Client (frpc)...${RESET}"
     
-    # Ambil port dari .env jika ada
+    # Ambil port dari .env jika ada di folder kerja
     if [ -f "${SCRIPT_DIR}/.env" ]; then
         # shellcheck disable=SC1091
         source "${SCRIPT_DIR}/.env" 2>/dev/null || true
@@ -292,12 +367,12 @@ setup_frp_client() {
     REMOTE_M3_PORT="${FRP_REMOTE_M365_PORT:-$M3_PORT}"
 
     CONFIG_FILE="/etc/frp/frpc.toml"
-    LOCAL_CONFIG="${SCRIPT_DIR}/frp/frpc.toml"
 
     # Buat file konfigurasi frpc.toml
     cat <<EOF | $SUDO tee "$CONFIG_FILE" >/dev/null
 # ==============================================================================
 # FRP Client Configuration (frpc.toml) - Auto-generated by install-frp.sh
+# Repository: https://github.com/andonebekasi/agentai
 # ==============================================================================
 
 serverAddr = "${SERVER_ADDR}"
@@ -350,10 +425,13 @@ localPort = ${M3_PORT}
 remotePort = ${REMOTE_M3_PORT}
 EOF
 
-    # Sinkronkan juga ke direktori project frp/frpc.toml
-    cp "$CONFIG_FILE" "$LOCAL_CONFIG" 2>/dev/null || $SUDO cp "$CONFIG_FILE" "$LOCAL_CONFIG"
+    # Sinkronkan juga ke direktori project frp/frpc.toml jika folder ada
+    if [ -d "${SCRIPT_DIR}/frp" ] || [ -f "${SCRIPT_DIR}/docker-compose.yml" ]; then
+        mkdir -p "${SCRIPT_DIR}/frp"
+        cp "$CONFIG_FILE" "${SCRIPT_DIR}/frp/frpc.toml" 2>/dev/null || $SUDO cp "$CONFIG_FILE" "${SCRIPT_DIR}/frp/frpc.toml" 2>/dev/null || true
+    fi
 
-    echo -e "${GREEN}✓ File konfigurasi frpc.toml berhasil dibuat di /etc/frp/frpc.toml dan ./frp/frpc.toml.${RESET}"
+    echo -e "${GREEN}✓ File konfigurasi frpc.toml berhasil dibuat di /etc/frp/frpc.toml.${RESET}"
 
     # Buat systemd service frpc
     echo -e "${BLUE}[SYSTEMD] Memasang systemd service untuk frpc...${RESET}"
@@ -380,10 +458,10 @@ EOF
         $SUDO systemctl enable frpc
         echo -e "${BLUE}[INFO] Menjalankan service frpc...${RESET}"
         $SUDO systemctl restart frpc || true
-        echo -e "${GREEN}✓ Service frpc aktif dan enabled saat boot.${RESET}"
+        echo -e "${GREEN}✓ Service frpc aktif dan auto-start saat boot.${RESET}"
     fi
 
-    # Update .env jika ada
+    # Update .env jika ada di folder kerja
     if [ -f "${SCRIPT_DIR}/.env" ]; then
         if grep -q "ENABLE_FRP=" "${SCRIPT_DIR}/.env"; then
             sed -i "s/^ENABLE_FRP=.*/ENABLE_FRP=true/" "${SCRIPT_DIR}/.env"
@@ -394,18 +472,18 @@ EOF
 }
 
 # ------------------------------------------------------------------------------
-# 8. Konfigurasi FRP Server (frps)
+# 10. Konfigurasi FRP Server (frps)
 # ------------------------------------------------------------------------------
 setup_frp_server() {
     echo ""
     echo -e "${CYAN}${BOLD}[CONFIG] Mengonfigurasi FRP Server (frps)...${RESET}"
     
     CONFIG_FILE="/etc/frp/frps.toml"
-    LOCAL_CONFIG="${SCRIPT_DIR}/frp/frps.toml"
 
     cat <<EOF | $SUDO tee "$CONFIG_FILE" >/dev/null
 # ==============================================================================
 # FRP Server Configuration (frps.toml) - Auto-generated by install-frp.sh
+# Repository: https://github.com/andonebekasi/agentai
 # ==============================================================================
 
 bindPort = ${SERVER_PORT}
@@ -415,8 +493,8 @@ auth.token = "${AUTH_TOKEN}"
 
 webServer.addr = "0.0.0.0"
 webServer.port = ${DASHBOARD_PORT}
-webServer.user = "admin"
-webServer.password = "admin123456"
+webServer.user = "${DASHBOARD_USER}"
+webServer.password = "${DASHBOARD_PASS}"
 
 log.to = "/var/log/frps.log"
 log.level = "info"
@@ -426,9 +504,12 @@ transport.tcpMux = true
 transport.maxPoolCount = 50
 EOF
 
-    cp "$CONFIG_FILE" "$LOCAL_CONFIG" 2>/dev/null || $SUDO cp "$CONFIG_FILE" "$LOCAL_CONFIG"
+    if [ -d "${SCRIPT_DIR}/frp" ] || [ -f "${SCRIPT_DIR}/docker-compose.yml" ]; then
+        mkdir -p "${SCRIPT_DIR}/frp"
+        cp "$CONFIG_FILE" "${SCRIPT_DIR}/frp/frps.toml" 2>/dev/null || $SUDO cp "$CONFIG_FILE" "${SCRIPT_DIR}/frp/frps.toml" 2>/dev/null || true
+    fi
 
-    echo -e "${GREEN}✓ File konfigurasi frps.toml berhasil dibuat di /etc/frp/frps.toml dan ./frp/frps.toml.${RESET}"
+    echo -e "${GREEN}✓ File konfigurasi frps.toml berhasil dibuat di /etc/frp/frps.toml.${RESET}"
 
     # Buat systemd service frps
     echo -e "${BLUE}[SYSTEMD] Memasang systemd service untuk frps...${RESET}"
@@ -455,12 +536,38 @@ EOF
         $SUDO systemctl enable frps
         echo -e "${BLUE}[INFO] Menjalankan service frps...${RESET}"
         $SUDO systemctl restart frps || true
-        echo -e "${GREEN}✓ Service frps aktif dan enabled saat boot.${RESET}"
+        echo -e "${GREEN}✓ Service frps aktif dan auto-start saat boot.${RESET}"
     fi
 }
 
 # ------------------------------------------------------------------------------
-# 9. Main Flow
+# 11. Pemeriksaan Firewall & Keamanan VPS
+# ------------------------------------------------------------------------------
+check_firewall_rules() {
+    echo ""
+    echo -e "${YELLOW}${BOLD}[FIREWALL & KEAMANAN VPS]${RESET}"
+    if command -v ufw >/dev/null 2>&1 && sudo ufw status 2>/dev/null | grep -qw "active"; then
+        echo -e "${YELLOW}Terdeteksi firewall UFW sedang aktif pada VPS ini.${RESET}"
+        echo -e "Jalankan perintah berikut untuk membuka port FRP dan tunnel AgentAI:"
+        echo -e "${CYAN}  sudo ufw allow ${SERVER_PORT}/tcp comment 'FRP Server Tunnel'${RESET}"
+        echo -e "${CYAN}  sudo ufw allow ${DASHBOARD_PORT}/tcp comment 'FRP Dashboard Web UI'${RESET}"
+        echo -e "${CYAN}  sudo ufw allow 20128/tcp comment '9Router AI Gateway'${RESET}"
+        echo -e "${CYAN}  sudo ufw allow 18789/tcp comment 'OpenClaw UI'${RESET}"
+        echo -e "${CYAN}  sudo ufw allow 8088/tcp comment 'Hermes Dashboard'${RESET}"
+        echo -e "${CYAN}  sudo ufw allow 18790/tcp comment 'NanoClaw Service'${RESET}"
+        echo -e "${CYAN}  sudo ufw allow 5365/tcp comment 'M365 Router'${RESET}"
+    elif command -v firewall-cmd >/dev/null 2>&1 && sudo firewall-cmd --state 2>/dev/null | grep -qw "running"; then
+        echo -e "${YELLOW}Terdeteksi firewalld sedang aktif pada VPS ini.${RESET}"
+        echo -e "Jalankan perintah berikut untuk membuka port:"
+        echo -e "${CYAN}  sudo firewall-cmd --permanent --add-port={${SERVER_PORT},${DASHBOARD_PORT},20128,18789,8088,18790,5365}/tcp && sudo firewall-cmd --reload${RESET}"
+    else
+        echo -e "Pastikan Security Group / Firewall VPS Anda (AWS, DigitalOcean, GCP, Linode, dll.)"
+        echo -e "telah mengizinkan port Inbound TCP berikut: ${CYAN}${SERVER_PORT}, ${DASHBOARD_PORT}, 20128, 18789, 8088, 18790, 5365${RESET}"
+    fi
+}
+
+# ------------------------------------------------------------------------------
+# 12. Main Execution
 # ------------------------------------------------------------------------------
 download_and_install_binaries
 
@@ -470,10 +577,12 @@ case "$ROLE" in
         ;;
     server)
         setup_frp_server
+        check_firewall_rules
         ;;
     both)
         setup_frp_server
         setup_frp_client
+        check_firewall_rules
         ;;
 esac
 
@@ -484,27 +593,27 @@ echo -e "${GREEN}${BOLD}========================================================
 echo ""
 
 if [[ "$ROLE" == "server" || "$ROLE" == "both" ]]; then
-    echo -e "${BOLD}Informasi FRP Server (VPS):${RESET}"
+    echo -e "${BOLD}Informasi FRP Server (VPS Publik):${RESET}"
     echo -e "  - Bind Port       : ${CYAN}${SERVER_PORT}${RESET}"
     echo -e "  - Auth Token      : ${YELLOW}${AUTH_TOKEN}${RESET}"
-    echo -e "  - Web Dashboard   : ${CYAN}http://IP-VPS:${DASHBOARD_PORT}${RESET} (User: ${YELLOW}admin${RESET} / Pass: ${YELLOW}admin123456${RESET})"
-    echo -e "  - Systemd Command : ${YELLOW}sudo systemctl status frps${RESET}"
+    echo -e "  - Web Dashboard   : ${CYAN}http://IP-VPS:${DASHBOARD_PORT}${RESET} (User: ${YELLOW}${DASHBOARD_USER}${RESET} / Pass: ${YELLOW}${DASHBOARD_PASS}${RESET})"
+    echo -e "  - Status Service  : ${YELLOW}sudo systemctl status frps${RESET}"
+    echo -e "  - Log Service     : ${YELLOW}sudo journalctl -u frps -f${RESET} atau ${YELLOW}/var/log/frps.log${RESET}"
     echo ""
 fi
 
 if [[ "$ROLE" == "client" || "$ROLE" == "both" ]]; then
-    echo -e "${BOLD}Informasi FRP Client (Local Host):${RESET}"
+    echo -e "${BOLD}Informasi FRP Client (Host Lokal / AgentAI):${RESET}"
     echo -e "  - Terhubung ke    : ${CYAN}${SERVER_ADDR}:${SERVER_PORT}${RESET}"
     echo -e "  - Auth Token      : ${YELLOW}${AUTH_TOKEN}${RESET}"
-    echo -e "  - Systemd Command : ${YELLOW}sudo systemctl status frpc${RESET}"
+    echo -e "  - Status Service  : ${YELLOW}sudo systemctl status frpc${RESET}"
+    echo -e "  - Log Service     : ${YELLOW}sudo journalctl -u frpc -f${RESET}"
     echo ""
-    echo -e "${BOLD}Daftar Akses Remote (via VPS IP ${SERVER_ADDR}):${RESET}"
+    echo -e "${BOLD}Daftar Akses Remote (melalui IP VPS ${SERVER_ADDR}):${RESET}"
     echo -e "  - 9Router AI Gateway : ${CYAN}http://${SERVER_ADDR}:20128${RESET}"
     echo -e "  - OpenClaw UI        : ${CYAN}http://${SERVER_ADDR}:18789${RESET}"
     echo -e "  - Hermes Dashboard   : ${CYAN}http://${SERVER_ADDR}:8088${RESET}"
     echo -e "  - NanoClaw Service   : ${CYAN}http://${SERVER_ADDR}:18790${RESET}"
     echo -e "  - M365 AI Router     : ${CYAN}http://${SERVER_ADDR}:5365/v1${RESET}"
-    echo ""
-    echo -e "${YELLOW}Catatan Keamanan:${RESET} Pastikan firewall / Security Group VPS Anda telah membuka port-port di atas."
 fi
 echo -e "${GREEN}======================================================================${RESET}"
