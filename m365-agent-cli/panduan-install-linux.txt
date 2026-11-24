@@ -1,0 +1,302 @@
+================================================================================
+      .---.           ___    _   ______  ____   ____  ___    _   ______________  ___    ___    _   __
+     /     \         /   |  / | / / __ \/  _/  / __ \/   |  / | / / ____/ ____/ / __ \/   |  / | / /
+     \.@_@./        / /| | /  |/ / / / // /   / /_/ / /| | /  |/ / / __/ __/   / /_/ / /| | /  |/ / 
+     /`\_/`\       / ___ |/ /|  / /_/ // /   / ____/ ___ |/ /|  / /_/ / /___  / _, _/ ___ |/ /|  /  
+    //  _  \\      /_/  |_/_/ |_/_____/___/  /_/   /_/  |_/_/ |_/\____/_____/ /_/ |_/_/  |_/_/ |_/   
+   | \     )|_     ⚡ A N D I   P A N G E R A N   M 3 6 5   C L I  •  v1.0.0
+  /`\_`>  <_/ \    ──────────────────────────────────────────────────────────────────────────────────
+  \__/'---'\__/    🐧 Linux Copilot Agent (https://m365.cloud.microsoft/chat)
+================================================================================
+PANDUAN INSTALASI & TRANSFER M365 COPILOT CLI (m365) DI BERBAGAI DISTRO LINUX
+================================================================================
+Nama Aplikasi       : m365-copilot-cli (perintah: `m365` / `m365-copilot`)
+Target Layanan      : https://m365.cloud.microsoft/chat
+Installer Otomatis  : ./install.sh
+Uninstaller         : ./uninstall.sh
+================================================================================
+
+DAFTAR ISI:
+1. Prasyarat Sistem
+2. Cara Memindahkan Proyek ke Server / PC Linux Lain
+3. Cara Instalasi Otomatis (Direkomendasikan - Semua Distro)
+4. Cara Instalasi Manual per Distro Linux:
+   A. Ubuntu / Debian / Linux Mint / Pop!_OS / Kali Linux (apt)
+   B. RHEL / AlmaLinux / Rocky Linux / CentOS Stream / Fedora (dnf / yum)
+   C. Arch Linux / Manjaro / EndeavourOS (pacman)
+   D. openSUSE Leap / Tumbleweed (zypper)
+   E. Alpine Linux (apk)
+5. Cara Memindahkan Sesi Login (Tanpa Perlu Login Ulang di Linux Baru)
+6. Cara Penggunaan Pertama Kali setelah Instalasi (GUI & SSH/PuTTY)
+7. Troubleshooting & Cara Uninstall
+
+--------------------------------------------------------------------------------
+1. PRASYARAT SISTEM
+--------------------------------------------------------------------------------
+- Sistem Operasi : Linux 64-bit (`x86_64` / `amd64` atau `aarch64` / `arm64`)
+- Runtime        : Node.js versi 18 ke atas (disarankan Node.js v20 LTS / v22)
+- Browser Engine : Chromium (otomatis diunduh oleh Playwright) beserta library
+                   sistem headless (libnss3, libatk, libgbm, libasound, dll.)
+- Opsional       : `cloudflared` (untuk membuat URL login dinamis
+                   `https://xxxx.trycloudflare.com` saat diakses via SSH/PuTTY)
+
+
+--------------------------------------------------------------------------------
+2. CARA MEMINDAHKAN PROYEK KE SERVER / PC LINUX LAIN
+--------------------------------------------------------------------------------
+Jika Anda ingin menginstal `m365` di mesin Linux lain (misalnya VPS, server
+kantor, atau laptop lain), Anda dapat mengemas folder proyek ini tanpa
+menyertakan `node_modules` agar ukuran file sangat kecil (< 50 KB):
+
+A. Di Komputer/Server Asal (Saat Ini):
+   Jalankan perintah berikut untuk membuat paket `.tar.gz`:
+
+     cd /home/andi/script/test18
+     tar --exclude='node_modules' -czvf m365-copilot-cli.tar.gz .
+
+B. Kirim ke Server / Linux Tujuan (via SCP / SFTP / rsync):
+
+     scp m365-copilot-cli.tar.gz user@ip-linux-tujuan:~/
+
+C. Di Server / Linux Tujuan:
+   Ekstrak paket tersebut:
+
+     mkdir -p ~/m365-copilot-cli
+     tar -xzvf ~/m365-copilot-cli.tar.gz -C ~/m365-copilot-cli
+     cd ~/m365-copilot-cli
+
+
+--------------------------------------------------------------------------------
+3. CARA INSTALASI OTOMATIS (DIREKOMENDASIKAN - SEMUA DISTRO)
+--------------------------------------------------------------------------------
+Di dalam folder proyek terdapat script `install.sh` yang otomatis mendeteksi
+distro Linux Anda (`apt`, `dnf`, `yum`, `pacman`, `zypper`, `apk`), menginstal
+library sistem Chromium, Node.js >= 18, `cloudflared`, `npm install`, browser
+Playwright, serta mengatur `PATH` untuk perintah `m365`.
+
+1) Beri izin eksekusi dan jalankan installer:
+
+     chmod +x install.sh uninstall.sh
+     ./install.sh
+
+2) Opsi tambahan yang didukung `./install.sh`:
+   - Pasang symlink global di `/usr/local/bin/m365` (untuk semua user):
+       ./install.sh --global
+
+   - Gunakan langsung dari folder saat ini tanpa menyalin ke `~/.local/share`:
+       ./install.sh --in-place
+
+   - Lewati instalasi `cloudflared`:
+       ./install.sh --skip-cloudflared
+
+3) Setelah selesai, muat ulang konfigurasi shell Anda:
+
+     source ~/.bashrc
+     m365 --version
+
+
+--------------------------------------------------------------------------------
+4. CARA INSTALASI MANUAL PER DISTRO LINUX
+--------------------------------------------------------------------------------
+Jika Anda ingin melakukan instalasi langkah demi langkah secara manual pada
+distro Linux tertentu, ikuti panduan sesuai distro Anda di bawah ini:
+
+================================================================================
+A. UBUNTU / DEBIAN / LINUX MINT / POP!_OS / KALI LINUX (APT)
+================================================================================
+1. Instal paket dasar & library sistem untuk Headless Chromium:
+   sudo apt-get update
+   sudo apt-get install -y curl wget ca-certificates git tar gzip \
+     libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+     libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
+     libxrandr2 libgbm1 libpango-1.0-0 libcairo2 fonts-liberation
+
+   # Catatan untuk Ubuntu 24.04+:
+   sudo apt-get install -y libasound2t64
+   # Catatan untuk Ubuntu 22.04 / Debian 12 ke bawah:
+   sudo apt-get install -y libasound2
+
+2. Instal Node.js 20 LTS (jika belum ada):
+   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+   sudo apt-get install -y nodejs
+
+3. Instal cloudflared (opsional, untuk login mudah via SSH/PuTTY):
+   sudo curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+     -o /usr/local/bin/cloudflared
+   sudo chmod +x /usr/local/bin/cloudflared
+
+4. Instal dependensi proyek & Chromium Playwright:
+   cd ~/m365-copilot-cli
+   npm install
+   npx playwright install chromium
+   npx playwright install-deps chromium
+
+5. Pasang symlink perintah `m365`:
+   chmod +x ./bin/m365.js
+   mkdir -p ~/.local/bin
+   ln -sf "$(pwd)/bin/m365.js" ~/.local/bin/m365
+   export PATH="$HOME/.local/bin:$PATH"
+
+
+================================================================================
+B. RHEL / ALMALINUX / ROCKY LINUX / CENTOS STREAM / FEDORA (DNF / YUM)
+================================================================================
+1. Instal paket dasar & library sistem untuk Headless Chromium:
+   sudo dnf install -y curl wget ca-certificates git tar gzip \
+     nss nspr atk at-spi2-atk cups-libs libdrm libxkbcommon \
+     libXcomposite libXdamage libXrandr mesa-libgbm pango cairo \
+     alsa-lib liberation-fonts
+
+2. Instal Node.js 20 LTS (jika belum ada):
+   curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
+   sudo dnf install -y nodejs
+
+3. Instal cloudflared (opsional, untuk login via SSH/PuTTY):
+   sudo curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+     -o /usr/local/bin/cloudflared
+   sudo chmod +x /usr/local/bin/cloudflared
+
+4. Instal dependensi proyek & Chromium Playwright:
+   cd ~/m365-copilot-cli
+   npm install
+   npx playwright install chromium
+
+5. Pasang symlink perintah `m365`:
+   chmod +x ./bin/m365.js
+   sudo ln -sf "$(pwd)/bin/m365.js" /usr/local/bin/m365
+
+
+================================================================================
+C. ARCH LINUX / MANJARO / ENDEAVOUROS (PACMAN)
+================================================================================
+1. Instal Node.js, npm, dan library sistem untuk Headless Chromium:
+   sudo pacman -Sy --noconfirm --needed \
+     nodejs npm curl wget ca-certificates git tar gzip \
+     nss nspr at-spi2-core libcups libdrm libxkbcommon \
+     libxcomposite libxdamage libxrandr mesa pango cairo \
+     alsa-lib ttf-liberation cloudflared
+
+2. Instal dependensi proyek & Chromium Playwright:
+   cd ~/m365-copilot-cli
+   npm install
+   npx playwright install chromium
+
+3. Pasang symlink perintah `m365`:
+   chmod +x ./bin/m365.js
+   sudo ln -sf "$(pwd)/bin/m365.js" /usr/local/bin/m365
+
+
+================================================================================
+D. OPENSUSE LEAP / TUMBLEWEED (ZYPPER)
+================================================================================
+1. Instal Node.js, npm, dan library sistem untuk Headless Chromium:
+   sudo zypper --non-interactive install \
+     nodejs20 npm20 curl wget ca-certificates git tar gzip \
+     mozilla-nss libatk-1_0-0 libatk-bridge-2_0-0 libcups2 \
+     libdrm2 libxkbcommon0 libXcomposite1 libXdamage1 libXrandr2 \
+     libgbm1 libpango-1_0-0 libcairo2 libasound2 liberation-fonts
+
+2. Instal cloudflared (opsional):
+   sudo curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 \
+     -o /usr/local/bin/cloudflared
+   sudo chmod +x /usr/local/bin/cloudflared
+
+3. Instal dependensi proyek & Chromium Playwright:
+   cd ~/m365-copilot-cli
+   npm install
+   npx playwright install chromium
+
+4. Pasang symlink perintah `m365`:
+   chmod +x ./bin/m365.js
+   sudo ln -sf "$(pwd)/bin/m365.js" /usr/local/bin/m365
+
+
+================================================================================
+E. ALPINE LINUX (APK)
+================================================================================
+1. Instal bash, Node.js, npm, dan Chromium bawaan Alpine:
+   sudo apk add --no-cache bash curl wget ca-certificates git tar gzip \
+     nodejs npm nss freetype harfbuzz ttf-freefont chromium
+
+2. Instal dependensi proyek:
+   cd ~/m365-copilot-cli
+   npm install
+   npx playwright install chromium
+
+3. Pasang symlink perintah `m365`:
+   chmod +x ./bin/m365.js
+   sudo ln -sf "$(pwd)/bin/m365.js" /usr/local/bin/m365
+
+
+--------------------------------------------------------------------------------
+5. CARA MEMINDAHKAN SESI LOGIN (TANPA PERLU LOGIN ULANG DI LINUX BARU)
+--------------------------------------------------------------------------------
+Sesi & cookies login Microsoft 365 Anda disimpan di:
+  ~/.config/m365-copilot-cli/storage-state.json
+
+Jika Anda sudah berhasil login di Linux pertama dan ingin langsung memakai sesi
+yang sama di Linux kedua tanpa perlu login/MFA ulang:
+
+1. Salin file `storage-state.json` dari Linux pertama ke Linux kedua:
+   scp ~/.config/m365-copilot-cli/storage-state.json user@ip-linux-baru:~/
+
+2. Di Linux kedua, impor file tersebut:
+   m365 login --import-cookies ~/storage-state.json
+   rm ~/storage-state.json
+
+3. Cek status sesi:
+   m365 status
+
+
+--------------------------------------------------------------------------------
+6. CARA PENGGUNAAN PERTAMA KALI SETELAH INSTALASI
+--------------------------------------------------------------------------------
+A. Login (Otomatis mendeteksi Desktop GUI atau SSH/PuTTY):
+   m365 login
+
+   - Jika di Desktop Linux (memiliki GUI):
+     Jendela browser Chromium akan terbuka. Silakan login ke akun Microsoft 365
+     Anda sampai halaman Chat Copilot terbuka.
+   - Jika di Server / VPS via SSH atau PuTTY (Tanpa GUI):
+     CLI otomatis membuat URL publik dinamis Cloudflare:
+     `👉 https://xxxx-xxxx-xxxx-xxxx.trycloudflare.com`
+     Copy & Paste URL tersebut ke browser di PC/Laptop/HP Anda, lakukan login
+     Microsoft (termasuk MFA Authenticator), dan sesi akan otomatis tersimpan
+     di server Linux Anda.
+
+B. Mulai Mode Chat Interaktif (REPL):
+   m365
+
+C. Mode One-Shot (Langsung dari Terminal / Script):
+   m365 -p "Buatkan script bash untuk monitoring penggunaan disk"
+   git diff | m365 -p "Ringkas perubahan kode ini"
+
+
+--------------------------------------------------------------------------------
+7. TROUBLESHOOTING & CARA UNINSTALL
+--------------------------------------------------------------------------------
+A. Perintah `m365: command not found`
+   Pastikan `~/.local/bin` sudah masuk ke `PATH`:
+     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+     source ~/.bashrc
+   Atau pasang symlink ke `/usr/local/bin`:
+     sudo ln -sf ~/.local/share/m365-copilot-cli/bin/m365.js /usr/local/bin/m365
+
+B. Error `Host system is missing dependencies to run browsers`
+   Jalankan perintah otomatis dari Playwright untuk menginstal library yang
+   kurang:
+     sudo npx playwright install-deps chromium
+
+C. Error `cloudflared` pada arsitektur ARM64 (Raspberry Pi / AWS Graviton / Apple Silicon VM)
+   Script `./install.sh` otomatis mendeteksi `aarch64`/`arm64`. Jika memasang
+   manual di ARM64, gunakan URL binary ARM64:
+     sudo curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 \
+       -o /usr/local/bin/cloudflared
+     sudo chmod +x /usr/local/bin/cloudflared
+
+D. Cara Uninstall:
+   - Menghapus aplikasi tetapi menyimpan sesi login:
+       ./uninstall.sh
+   - Menghapus aplikasi beserta seluruh cookies & sesi login:
+       ./uninstall.sh --purge
+================================================================================

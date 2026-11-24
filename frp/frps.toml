@@ -1,0 +1,37 @@
+# ==============================================================================
+# FRP Server Configuration (frps.toml)
+# https://github.com/fatedier/frp
+# Digunakan pada VPS / Server dengan Public IP
+# ==============================================================================
+
+# Port listening untuk koneksi dari FRP Client (frpc)
+bindPort = 7000
+
+# Autentikasi Token (harus sama persis dengan frpc.toml di mesin client)
+auth.method = "token"
+auth.token = "change_this_secret_token_agentai"
+
+# Dashboard Web UI untuk memonitor trafik, client aktif, dan port proxy
+webServer.addr = "0.0.0.0"
+webServer.port = 7500
+webServer.user = "admin"
+webServer.password = "admin123456"
+
+# Konfigurasi batas port proxy yang diizinkan (opsional)
+# allowPorts = [
+#   { single = 5365 },
+#   { single = 8088 },
+#   { single = 18789 },
+#   { single = 18790 },
+#   { single = 20128 },
+#   { single = 2222 }
+# ]
+
+# Log configuration
+log.to = "/var/log/frps.log"
+log.level = "info"
+log.maxDays = 7
+
+# Transport settings
+transport.tcpMux = true
+transport.maxPoolCount = 50

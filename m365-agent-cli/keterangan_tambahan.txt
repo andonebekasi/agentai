@@ -1,0 +1,186 @@
+================================================================================
+KETERANGAN TAMBAHAN: M365 CLI (DOCKER + RPA SETARA AGY) & M365 9ROUTER DI HERMES
+================================================================================
+
+1. INTEGRASI M365 CLI: BACA FOLDER LINUX OTOMATIS, DOCKER & RPA (SETARA AGY / CLAUDE)
+--------------------------------------------------------------------------------
+`m365` (Andi Pangeran M365 CLI) memiliki kemampuan penuh untuk membaca Folder
+Lokal Linux saat login maupun saat masuk ke CLI, serta mengakses Container Docker
+dan Browser RPA (Chrome DevTools Protocol di port 9222) setara dengan `agy`
+(Google Antigravity CLI) dan `claude` (Claude Code):
+
+A. Fitur Baca Folder Otomatis (Workspace & Folder Reader):
+   1. Otomatis Baca Folder Saat Login & Masuk CLI:
+      - Saat menjalankan `m365 login` atau `m365` di folder mana pun (misal
+        `/home/andi/script/test14`), `m365` otomatis memindai folder kerja aktif,
+        menampilkan kotak **Workspace & Folder Reader** (jumlah file, sub-folder,
+        daftar script, dan dokumen), serta membaca aturan proyek (`CLAUDE.md`,
+        `AGENTS.md`, `M365.md`, `README.md`, `docs/*`).
+      - Prompt interaktif selalu menampilkan indikator folder aktif:
+        `⚡ [📁 ~/script/test14] m365 ❯`
+
+   2. Cara Membuka / Membaca Folder dari Terminal Linux:
+      - Masuk & otomatis baca folder saat ini:
+        m365
+      - Langsung buka & baca folder tertentu dari terminal (seperti agy/claude):
+        m365 /home/andi/script/test14
+      - Baca folder tertentu sekaligus kirim pertanyaan langsung:
+        m365 /home/andi/script/test14 "Jelaskan semua script di folder ini"
+      - Gunakan flag `--cwd` / `--dir` atau `--add-dir` (persis agy & claude):
+        m365 --cwd /home/andi/script/test14 --add-dir /home/andi/script/test18
+      - Tampilkan pohon direktori & ringkasan folder:
+        m365 dir /home/andi/script/test14
+
+   3. Cara Membaca / Pindah Folder di Dalam Sesi Interaktif (`m365 ❯`):
+      - Ketik langsung path folder Linux di prompt (otomatis pindah & baca):
+        /home/andi/script/test14
+        ~/script/test18
+        ./docs
+      - Ketik path folder diikuti instruksi:
+        /home/andi/script/test14 analisa semua script di folder ini
+      - Gunakan `@folder` atau `@file` (atau sebut nama file langsung):
+        Analisa isi @docs dan @rpa.py
+      - Perintah navigasi & baca folder di REPL `m365`:
+        /dir [path]       : Lihat ringkasan folder aktif atau pindah ke folder baru
+        /cd <path>        : Pindah folder kerja aktif (bisa juga ketik `cd <path>`)
+        /add-dir <path>   : Tambahkan folder ekstra ke konteks workspace
+        /ls [path]        : Tampilkan isi file & sub-folder (bisa juga ketik `ls`)
+        /tree [path]      : Tampilkan pohon direktori lengkap (bisa juga ketik `tree`)
+        /read <path>      : Baca penuh sebuah file atau seluruh file di dalam folder
+        exit / quit       : Keluar dari M365 CLI (bisa dengan atau tanpa `/`)
+
+B. Perintah CLI Langsung (`m365 rpa` & `m365 docker`):
+   - Cek status Docker, Cloudflare Tunnel & Tab Browser RPA:
+     m365 rpa status
+
+   - Lihat daftar tab yang terbuka di Browser RPA Docker:
+     m365 rpa tabs
+
+   - Baca seluruh teks & elemen interaktif dari layar Browser RPA saat ini:
+     m365 rpa content
+
+   - Klik tombol/elemen di layar Browser RPA (berdasarkan teks atau selector):
+     m365 rpa click "Resume" --by-text
+     m365 rpa click "Start Exam Lab" --by-text
+
+   - Ketik teks ke kolom input di Browser RPA:
+     m365 rpa type "input[type='email']" "jasalinux52@gmail.com"
+
+   - Buka URL tertentu di Browser RPA:
+     m365 rpa goto "https://skillbuilder.aws/..."
+
+   - Ambil screenshot dari Browser RPA Docker:
+     m365 rpa screenshot -o layar_rpa.png
+
+   - Minta Copilot menganalisa layar Browser RPA & mengerjakan otomatis:
+     m365 rpa ask "Analisa halaman AWS Skill Builder di layar RPA saat ini dan berikan langkah pengerjaannya"
+
+   - Jalankan perintah Docker:
+     m365 docker ps
+     m365 docker logs chromium-rpa
+
+C. Perintah Slash di Mode Interaktif (`m365`):
+   - `/rpa status`            : Cek container Docker, URL Cloudflare, & tab RPA
+   - `/rpa tabs`              : Lihat tab aktif di Browser RPA Docker
+   - `/rpa content`           : Tampilkan isi teks & tombol dari Browser RPA
+   - `/rpa click <teks>`      : Klik tombol/elemen di Browser RPA Docker
+   - `/rpa type <sel> <teks>` : Ketik teks ke input di Browser RPA Docker
+   - `/rpa goto <url>`        : Buka URL di Browser RPA Docker
+   - `/rpa screenshot [file]` : Ambil screenshot dari Browser RPA Docker
+   - `/rpa ask <instruksi>`   : Analisa isi layar Browser RPA saat ini dengan Copilot
+   - `/docker <perintah>`     : Jalankan perintah Docker langsung dari REPL
+   - `/agent auto`            : Aktifkan mode full auto-approve (tanpa tanya y/N)
+
+
+================================================================================
+2. M365 9ROUTER GATEWAY & PENGGUNAAN M365 SEBAGAI OTAK HERMES (WA / TELEGRAM)
+================================================================================
+
+`m365` dilengkapi **M365 9Router Gateway Server** (`http://localhost:5365`) yang
+mirip **9Router** (mendukung OpenAI `/v1/models`, `/v1/chat/completions`,
+`/v1/responses`, Anthropic `/v1/messages`, serta Web Dashboard UI) dan sudah
+terintegrasi sebagai otak **Hermes Agent**:
+
+A. Endpoint & Web Dashboard M365 9Router:
+   - Web Dashboard UI (9Router Style) : http://localhost:5365
+   - Akses Jaringan LAN               : http://192.168.1.10:5365
+   - OpenAI Compatible Base URL       : http://localhost:5365/v1
+   - Health & RPA Status JSON         : http://localhost:5365/health
+
+B. Cara Mengganti Otak Hermes ke M365 di Chat WhatsApp / Telegram / CLI:
+   Kirim salah satu perintah singkat berikut langsung di chat WhatsApp/Telegram
+   (TIDAK perlu mengetik `--provider` karena sudah dikonfigurasi Direct Alias
+   di `~/.hermes/config.yaml`):
+
+   - `/model m365`          -> Mode Standar M365 Copilot (+ Konteks Lokal, Docker & RPA)
+   - `/model m365-agent`    -> Mode Autonomous Agent (Auto-Execute Bash, Docker & RPA)
+   - `/model m365-rpa`      -> Mode Spesialis Browser RPA Docker (Port 9222)
+   - `/model m365-plan`     -> Mode Arsitek Step-by-Step (`/plan`)
+   - `/model m365-boost`    -> Mode Deep Thinking & Verifikasi (`/boost`)
+   - `/model m365-goal`     -> Mode Eksekusi Target Otonom (`/goal`)
+   - `/model m365-teamwork` -> Mode Kolaborasi Tim Multi-Agen (`/teamwork`)
+   - `/model agy`           -> Kembali ke Google Antigravity CLI (`agy`)
+
+   *(Catatan: Perintah dengan `--provider` seperti `/model m365 --provider "M365 Router"`
+   atau `/model m365 --provider "Agy Proxy"` juga tetap berfungsi normal setelah
+   perbaikan parser kutip/spasi pada `hermes_cli/model_switch.py`).*
+
+C. Pengelolaan Layanan Systemd (Berjalan Otomatis 24/7 di Background):
+   - Cek status M365 9Router : systemctl --user status hermes-m365-router
+   - Restart M365 9Router    : systemctl --user restart hermes-m365-router
+   - Lihat log live router   : journalctl --user -u hermes-m365-router -f
+   - Restart Hermes Gateway  : systemctl --user restart hermes-gateway
+   - Restart Agy Proxy       : systemctl --user restart hermes-agy-proxy
+
+   Jika ingin menjalankan M365 9Router manual dengan URL publik Cloudflare Tunnel:
+   m365 router --port 5365 --cloudflare
+================================================================================
+
+
+================================================================================
+3. FITUR BACA FOLDER LINUX DI M365 CLI (SETARA AGY & CLAUDE CODE)
+================================================================================
+
+Sekarang `m365` CLI dapat membaca folder kerja Linux secara otomatis saat kita
+login (`m365 login`) maupun saat kita masuk ke `m365` di terminal Linux, persis
+seperti cara kerja `agy` (Antigravity CLI) dan `claude` (Claude Code):
+
+A. Otomatis Baca Folder Saat Login & Saat Masuk M365 CLI:
+   - Saat dijalankan di sebuah folder (misalnya `/home/andi/script/test14`),
+     `m365 login` maupun `m365` otomatis memindai folder tersebut dan menampilkan
+     kotak **Workspace & Folder Reader** (jumlah file, sub-folder, daftar script
+     utama, dan dokumen aturan `CLAUDE.md`, `AGENTS.md`, `M365.md`, `README.md`,
+     `docs/*`).
+   - Prompt interaktif selalu menampilkan indikator folder aktif:
+     `⚡ [📁 ~/script/test14] m365 ❯`
+
+B. Perintah Baca Folder dari Terminal Linux (Bash):
+   - Masuk & otomatis baca folder saat ini:
+     m365
+   - Buka & baca folder tertentu:
+     m365 /home/andi/script/test14
+   - Baca folder tertentu sekaligus kirim pertanyaan (One-Shot):
+     m365 /home/andi/script/test14 "Sebutkan daftar script utama di folder ini dan fungsinya"
+   - Flag `--cwd` / `--dir` & `--add-dir` (setara agy & claude):
+     m365 --cwd /home/andi/script/test14 --add-dir /home/andi/script/test18
+   - Lihat pohon direktori & ringkasan folder:
+     m365 dir /home/andi/script/test14
+
+C. Perintah Baca & Pindah Folder di Dalam Sesi Interaktif (`m365 ❯`):
+   - Ketik langsung path folder Linux untuk pindah & baca isi folder:
+     /home/andi/script/test14
+     ~/script/test18
+     ./docs
+   - Ketik path folder diikuti instruksi:
+     /home/andi/script/test14 analisa semua script di folder ini
+   - Gunakan `@folder` / `@file` atau sebut nama file langsung:
+     Analisa @docs dan @rpa.py
+   - Perintah navigasi & baca folder:
+     /dir [path]       : Lihat ringkasan folder atau pindah folder
+     /cd <path>        : Pindah folder kerja aktif (bisa juga `cd <path>`)
+     /add-dir <path>   : Tambahkan folder ekstra ke konteks workspace
+     /ls [path]        : Lihat daftar file & sub-folder (bisa juga `ls`)
+     /tree [path]      : Lihat pohon direktori lengkap (bisa juga `tree`)
+     /read <path>      : Baca isi file atau seluruh file di dalam folder
+     exit / quit       : Keluar dari M365 CLI (dengan atau tanpa `/`)
+================================================================================

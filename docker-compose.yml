@@ -1,0 +1,138 @@
+name: agentai-stack
+
+services:
+  # ============================================================================
+  # 9Router: AI Gateway & Smart LLM Proxy
+  # Multi-provider routing, quota optimization, and fallback gateway
+  # ============================================================================
+  9router:
+    image: decolua/9router:latest
+    container_name: 9router
+    restart: unless-stopped
+    ports:
+      - "${NINE_ROUTER_PORT:-20128}:20128"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - PORT=20128
+      - HOSTNAME=0.0.0.0
+      - DATA_DIR=/app/data
+      - NEXT_TELEMETRY_DISABLED=1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    volumes:
+      - ./data/9router:/app/data
+    networks:
+      - agentai-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:20128/ || exit 0"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================================
+  # OpenClaw: Full-Featured Autonomous AI Assistant & Automation Gateway
+  # ============================================================================
+  openclaw:
+    image: ghcr.io/openclaw/openclaw:latest
+    container_name: openclaw
+    restart: unless-stopped
+    ports:
+      - "${OPENCLAW_PORT:-18789}:18789"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - NODE_ENV=production
+      - OPENAI_BASE_URL=http://9router:20128/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-router-key}
+      - ANTHROPIC_BASE_URL=http://9router:20128
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-router-key}
+      - LOG_LEVEL=${OPENCLAW_LOG_LEVEL:-info}
+    volumes:
+      - ./data/openclaw:/home/node/.openclaw
+    depends_on:
+      - 9router
+    networks:
+      - agentai-net
+
+  # ============================================================================
+  # Hermes Agent (Nous Research): Self-Improving Autonomous Agent
+  # ============================================================================
+  hermes:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-agent
+    restart: unless-stopped
+    ports:
+      - "${HERMES_PORT:-8088}:9119"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - HERMES_DASHBOARD=${HERMES_DASHBOARD:-true}
+      - HERMES_DASHBOARD_HOST=0.0.0.0
+      - HERMES_DASHBOARD_PORT=9119
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_AUTH_USER:-admin}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_AUTH_PASS:-admin123456}
+      - OPENAI_BASE_URL=http://9router:20128/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-router-key}
+      - HERMES_HOME=/opt/data
+      - HERMES_WRITE_SAFE_ROOT=/opt/data
+    volumes:
+      - ./data/hermes:/opt/data
+    depends_on:
+      - 9router
+    networks:
+      - agentai-net
+
+  # ============================================================================
+  # NanoClaw: Lightweight, Secure, Containerized Personal Agent
+  # ============================================================================
+  nanoclaw:
+    build:
+      context: .
+      dockerfile: docker/nanoclaw/Dockerfile
+    image: agentai/nanoclaw:latest
+    container_name: nanoclaw
+    restart: unless-stopped
+    ports:
+      - "${NANOCLAW_PORT:-18790}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - NODE_ENV=production
+      - DATA_DIR=/app/data
+      - PORT=3000
+      - OPENAI_BASE_URL=http://9router:20128/v1
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-router-key}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-router-key}
+    volumes:
+      - ./data/nanoclaw:/app/data
+    depends_on:
+      - 9router
+    networks:
+      - agentai-net
+
+  # ============================================================================
+  # FRP (Fast Reverse Proxy) Client
+  # Opsional: Mengekspos service lokal ke VPS publik melalui tunnel terenkripsi
+  # Aktifkan dengan flag: docker compose --profile frp up -d
+  # Atau set COMPOSE_PROFILES=frp di file .env
+  # ============================================================================
+  frpc:
+    image: fatedier/frpc:v0.72.0
+    container_name: agentai-frpc
+    restart: unless-stopped
+    network_mode: "host"
+    volumes:
+      - ./frp/frpc.toml:/etc/frp/frpc.toml:ro
+    profiles:
+      - frp
+
+networks:
+  agentai-net:
+    driver: bridge
+    name: agentai-net

@@ -1,0 +1,27 @@
+# Environment variables (do not commit secrets)
+.env
+.env.local
+.env.*.local
+
+# Persistent container data & volumes
+data/
+
+# Log files
+*.log
+logs/
+
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# FRP binaries
+frp/frpc
+frp/frps
+frpc
+frps
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,78 @@
+# ==============================================================================
+# FRP Client Configuration (frpc.toml) - AgentAI Stack
+# https://github.com/fatedier/frp
+# Digunakan pada Host AgentAI (mesin lokal / server di balik NAT / firewall)
+# ==============================================================================
+
+# Alamat IP Publik atau Domain dari FRP Server (VPS Anda)
+serverAddr = "127.0.0.1"
+serverPort = 7000
+
+# Autentikasi Token (harus sama persis dengan frps.toml di server VPS)
+auth.method = "token"
+auth.token = "change_this_secret_token_agentai"
+
+# Transport options
+transport.tcpMux = true
+transport.poolCount = 5
+
+# ------------------------------------------------------------------------------
+# 1. 9Router - AI Gateway & Dashboard (Default Port: 20128)
+# ------------------------------------------------------------------------------
+[[proxies]]
+name = "agentai-9router"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 20128
+remotePort = 20128
+
+# ------------------------------------------------------------------------------
+# 2. OpenClaw - Autonomous AI Control UI (Default Port: 18789)
+# ------------------------------------------------------------------------------
+[[proxies]]
+name = "agentai-openclaw"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 18789
+remotePort = 18789
+
+# ------------------------------------------------------------------------------
+# 3. Hermes Agent - Nous Research Web Dashboard (Default Port: 8088)
+# ------------------------------------------------------------------------------
+[[proxies]]
+name = "agentai-hermes"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 8088
+remotePort = 8088
+
+# ------------------------------------------------------------------------------
+# 4. NanoClaw - Sandboxed Agent Runner (Default Port: 18790)
+# ------------------------------------------------------------------------------
+[[proxies]]
+name = "agentai-nanoclaw"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 18790
+remotePort = 18790
+
+# ------------------------------------------------------------------------------
+# 5. M365 Copilot AI Router (Default Port: 5365)
+# ------------------------------------------------------------------------------
+[[proxies]]
+name = "agentai-m365-router"
+type = "tcp"
+localIP = "127.0.0.1"
+localPort = 5365
+remotePort = 5365
+
+# ------------------------------------------------------------------------------
+# 6. SSH Remote Host Access (Opsional - Port: 22)
+# Aktifkan jika ingin remote SSH ke mesin lokal ini lewat VPS
+# ------------------------------------------------------------------------------
+# [[proxies]]
+# name = "agentai-ssh"
+# type = "tcp"
+# localIP = "127.0.0.1"
+# localPort = 22
+# remotePort = 2222

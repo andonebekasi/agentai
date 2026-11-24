@@ -1,0 +1,352 @@
+========================================================================
+      .---.           ___    _   ______  ____   ____  ___    _   ______________  ___    ___    _   __
+     /     \         /   |  / | / / __ \/  _/  / __ \/   |  / | / / ____/ ____/ / __ \/   |  / | / /
+     \.@_@./        / /| | /  |/ / / / // /   / /_/ / /| | /  |/ / / __/ __/   / /_/ / /| | /  |/ / 
+     /`\_/`\       / ___ |/ /|  / /_/ // /   / ____/ ___ |/ /|  / /_/ / /___  / _, _/ ___ |/ /|  /  
+    //  _  \\      /_/  |_/_/ |_/_____/___/  /_/   /_/  |_/_/ |_/\____/_____/ /_/ |_/_/  |_/_/ |_/   
+   | \     )|_     ⚡ A N D I   P A N G E R A N   M 3 6 5   C L I  •  v1.0.0
+  /`\_`>  <_/ \    ──────────────────────────────────────────────────────────────────────────────────
+  \__/'---'\__/    🐧 Linux Copilot Agent (https://m365.cloud.microsoft/chat)
+========================================================================
+PANDUAN MICROSOFT 365 COPILOT LINUX CLI (m365)
+Target URL: https://m365.cloud.microsoft/chat
+Lokasi Proyek: /home/andi/script/test18
+Lokasi Binary Global: /home/andi/.local/bin/m365
+Lokasi Konfigurasi & Sesi: /home/andi/.config/m365-copilot-cli/
+========================================================================
+
+1. DESKRIPSI SINGKAT
+--------------------
+CLI interaktif untuk mengakses Microsoft 365 Copilot langsung dari terminal
+Linux dengan gaya seperti `agy` dan `claude` CLI.
+Menggunakan Playwright Persistent Browser Session sehingga Anda cukup login
+sekali melalui browser (mendukung akun kantor/kampus Microsoft Entra ID, SSO,
+MFA/Authenticator, maupun akun Microsoft Personal), lalu sesi & cookies
+disimpan secara lokal agar interaksi chat berikutnya berjalan secara headless
+langsung dari CLI tanpa memerlukan API key berbayar tambahan.
+
+
+2. STRUKTUR FILE PROYEK
+-----------------------
+- /home/andi/script/test18/package.json
+  Konfigurasi paket Node.js & dependensi (playwright, commander, chalk, ora,
+  marked, marked-terminal).
+
+- /home/andi/script/test18/bin/m365.js
+  Entrypoint executable CLI (`m365` dan `m365-copilot`).
+
+- /home/andi/script/test18/src/index.js
+  Definisi subcommand CLI (`login`, `status`, `logout`, `ask`, `config`),
+  argumen, opsi (`--device`, `--no-device`, `--ssh`, `--no-browser`,
+  `--cloudflare`, `--no-cloudflare`, `--port`), dan dukungan piping (`stdin`).
+
+- /home/andi/script/test18/src/auth.js
+  Modul autentikasi browser interaktif (`loginInteractive`), dukungan otomatis
+  mode SSH/PuTTY tanpa GUI dengan URL Dinamis Cloudflare (`trycloudflare.com`),
+  impor cookies JSON (`importCookiesFromFile`), pengecekan status
+  (`printStatus`), dan hapus sesi (`logoutSession`).
+
+- /home/andi/script/test18/src/remote-login-server.js
+  Server Web Portal Login sementara (`http://127.0.0.1:8365`) yang terintegrasi
+  otomatis dengan **Cloudflare Quick Tunnel (`https://<random>.trycloudflare.com`)**
+  agar pengguna SSH / PuTTY dapat langsung copy-paste URL publik dinamis ke
+  browser PC/Laptop/HP dari jaringan mana saja tanpa perlu mengatur SSH Tunnel
+  dan tanpa memerlukan XServer / DISPLAY di Linux server.
+
+- /home/andi/script/test18/src/browser-client.js
+  Engine utama `M365CopilotClient` yang menjalankan persistent headless
+  browser dan menangkap respons Copilot secara real-time.
+
+- /home/andi/script/test18/src/dom-helpers.js
+  Deteksi multi-frame & Shadow DOM untuk kotak input chat Copilot serta
+  parser streaming WebSocket SignalR.
+
+- /home/andi/script/test18/src/repl.js
+  Mode interaktif TUI/REPL (`startInteractiveRepl`) dengan slash commands
+  dan mode one-shot (`runOneShot`).
+
+- /home/andi/script/test18/src/config.js
+  Manajemen direktori konfigurasi, profil browser, storage-state cookies,
+  dan riwayat percakapan di `~/.config/m365-copilot-cli/`.
+
+- /home/andi/script/test18/README.md
+  Dokumentasi proyek dalam format Markdown.
+
+
+3. PANDUAN KHUSUS LOGIN DARI SSH / PUTTY DENGAN URL DINAMIS CLOUDFLARE
+----------------------------------------------------------------------
+Jika Anda mengakses server Linux menggunakan SSH atau PuTTY dari Windows/Laptop
+tanpa XServer (`Missing X server or $DISPLAY`), CLI ini sudah dilengkapi
+fitur **Headless Web Login Portal + Cloudflare Quick Tunnel (`trycloudflare.com`)**
+sehingga Anda cukup **Copy-Paste URL Dinamis Cloudflare** dari terminal PuTTY ke
+browser di PC/Laptop/HP Anda **TANPA perlu membuat SSH Tunnel**.
+
+A. Perintah untuk Memulai Login dari SSH / PuTTY:
+   Cukup jalankan salah satu perintah berikut di PuTTY:
+
+     m365 login
+     m365 login --device
+     m365 login --no-device
+     m365 login --ssh
+     m365 login --no-browser
+     m365 login --cloudflare
+
+   (Catatan: Saat dijalankan di SSH/PuTTY tanpa $DISPLAY, perintah `m365 login`
+   biasa pun akan otomatis masuk ke mode Headless Web Login + Cloudflare Tunnel).
+
+B. Cara Kerja & Tampilan URL Dinamis Cloudflare di Terminal PuTTY:
+   - CLI otomatis menjalankan Chromium secara headless di server pada port lokal
+     (default: `8365`).
+   - CLI kemudian memanggil `/usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8365`
+     secara otomatis di background untuk membuat URL HTTPS publik dinamis
+     (`https://<kata-acak>.trycloudflare.com`) tanpa memerlukan akun Cloudflare.
+   - Tampilan yang muncul di terminal PuTTY:
+
+     ✔ Cloudflare Quick Tunnel aktif: https://xxxx-xxxx-xxxx-xxxx.trycloudflare.com
+
+     📋 COPY & PASTE URL DINAMIS BERIKUT KE BROWSER DI PC / HP / LAPTOP ANDA:
+        👉  https://xxxx-xxxx-xxxx-xxxx.trycloudflare.com
+        Alternatif LAN   : http://192.168.1.10:8365
+        Alternatif Lokal : http://localhost:8365  (tanpa perlu SSH tunnel jika memakai URL Cloudflare di atas)
+
+C. Langkah-Langkah Login di Browser PC/Laptop/HP Anda:
+   1) Blok/sorot URL `https://xxxx-xxxx-xxxx-xxxx.trycloudflare.com` di layar PuTTY
+      (di PuTTY, menyorot teks dengan mouse otomatis meng-copy teks tersebut),
+      lalu Paste ke address bar browser (Chrome / Edge / Firefox / Safari di PC
+      maupun HP) dari jaringan internet mana saja.
+   2) Di halaman web yang terbuka, Anda akan melihat tampilan live halaman
+      login Microsoft 365 dari server.
+   3) Untuk mengisi Email, Password, atau Kode OTP/MFA:
+      - Cara 1: Klik langsung pada kolom input di gambar layar browser, lalu
+        ketik menggunakan keyboard Anda.
+      - Cara 2: Gunakan kotak **"Ketik atau Paste Email / Password / Kode OTP"**
+        di bagian atas halaman web, lalu klik tombol **"Ketik + Enter ↵"**.
+   4) Selesaikan verifikasi MFA / Authenticator jika diminta, dan klik **"Yes"**
+      pada tampilan **"Stay signed in?"**.
+   5) Tunggu sampai halaman Chat Microsoft 365 Copilot terbuka.
+   6) Penyimpanan sesi & Penutupan Tunnel Otomatis:
+      - Otomatis: CLI akan otomatis mendeteksi halaman Chat Copilot dan
+        menyimpan sesi dalam 3 detik, lalu **menutup proses Cloudflare Tunnel
+        secara otomatis** agar URL sementara tersebut tidak lagi aktif.
+      - Manual via Web: Klik tombol hijau **"✅ Simpan Sesi & Selesai"** di
+        pojok kanan atas halaman web.
+      - Manual via PuTTY: Tekan tombol **[ENTER]** di terminal PuTTY kapan saja.
+
+D. Opsi Tambahan untuk Login SSH / PuTTY:
+   - Mematikan Cloudflare Tunnel (jika hanya ingin memakai IP LAN lokal
+     `http://192.168.1.10:8365`):
+     m365 login --no-cloudflare
+
+   - Mengganti port Web Login Server lokal (default: 8365):
+     m365 login --port 9000
+
+   - Impor Cookies langsung dari halaman Web Portal atau CLI:
+     Di halaman Web Portal (`https://xxxx.trycloudflare.com`), tersedia juga
+     tombol **"🍪 Paste Cookies"** jika Anda ingin mem-paste JSON cookies dari
+     ekstensi Cookie-Editor, atau melalui perintah:
+     m365 login --import-cookies cookies.json
+
+
+4. CARA PENGGUNAAN CHAT COPILOT DARI CLI
+----------------------------------------
+
+A. Mode Chat Interaktif / REPL (seperti `agy` / `claude`)
+   Jalankan tanpa argumen:
+
+     m365
+
+   Daftar Slash Commands di dalam sesi interaktif (Setara Antigravity / AGY):
+   [Alur Kerja Agentic / Antigravity Slash Commands]
+   - /plan <tugas>              : Buat rencana arsitektur & implementasi bertahap
+   - /goal <target>             : Mode otonom berlapis sampai target selesai
+   - /boost <pertanyaan>        : Deep Thinking, multi-perspektif & verifikasi ketat
+   - /grill-me <topik>          : Wawancara interaktif untuk mematangkan desain proyek
+   - /teamwork <tugas>          : Simulasi kolaborasi 3 sub-agen (Researcher, Coder, QA)
+   - /compact                   : Ringkas & padatkan konteks percakapan ke sesi baru
+   - /learn [aturan|clear]      : Simpan preferensi/aturan permanen ke MEMORY.md
+   - /browser <url> [prompt]    : Buka URL web via Playwright & analisa isinya
+   - /schedule <durasi> <tugas> : Jalankan prompt terjadwal (contoh: /schedule 5m Cek log)
+   - /skills                    : Lihat daftar custom skills yang terpasang
+
+   [Integrasi Workspace, @file & Eksekusi Lokal]
+   - @<path/file>               : Lampirkan isi file/folder otomatis ke prompt
+   - !<perintah_linux>          : Jalankan perintah bash langsung dari REPL (contoh: !ls -la)
+   - /run <perintah_linux>      : Jalankan perintah bash & kirim hasilnya ke Copilot
+   - /apply [all|nama_file]     : Terapkan/simpan blok kode dari respons Copilot ke file
+   - /agent [on|off|auto]       : Aktifkan/matikan deteksi pembuatan file & bash otomatis
+
+   [Manajemen Sesi M365 Copilot]
+   - /help                      : Tampilkan daftar perintah bantuan
+   - /new atau /clear           : Mulai sesi percakapan baru (reset konteks Copilot)
+   - /status                    : Lihat status sesi cookies, mode Agent & jadwal aktif
+   - /save <file.md>            : Simpan jawaban terakhir Copilot ke file Markdown
+   - /screenshot [file]         : Ambil screenshot halaman browser Copilot saat ini
+   - /history                   : Tampilkan 10 riwayat pertanyaan terakhir
+   - /login                     : Buka portal login ulang / perbarui sesi
+   - /logout                    : Hapus sesi login & cookies lokal
+   - /exit atau /quit           : Keluar dari Andi Pangeran M365 CLI
+
+
+B. Mode One-Shot (Langsung dari Baris Perintah & Piping)
+   - Kirim satu pertanyaan dengan flag -p / --prompt:
+     m365 -p "Buatkan contoh Dockerfile untuk aplikasi Node.js"
+
+   - Kirim pertanyaan langsung sebagai argumen:
+     m365 "Ringkas poin penting tentang Kubernetes StatefulSet"
+
+   - Menggunakan subcommand `ask`:
+     m365 ask "Apa perbedaan proses dan thread di Linux?"
+
+   - Piping dari output perintah Linux lain (stdin):
+     git diff | m365 -p "Buatkan commit message dari perubahan ini"
+     cat /var/log/syslog | tail -n 50 | m365 -p "Analisa apakah ada error"
+
+   - Output teks murni tanpa format Markdown (untuk disimpan ke script/file):
+     m365 --raw -p "Tulis script bash hello world" > hello.sh
+
+
+C. Opsi Tambahan & Manajemen Sesi
+   - Cek status sesi cookies yang tersimpan:
+     m365 status
+
+   - Verifikasi apakah sesi masih aktif ke server Microsoft secara headless:
+     m365 status --verify
+
+   - Gunakan browser Firefox (default: Chromium):
+     m365 --browser firefox
+
+   - Lihat atau ubah konfigurasi default:
+     m365 config
+     m365 config --set-timeout 180000
+
+   - Logout / hapus seluruh cookies dan profil sesi:
+     m365 logout
+
+
+5. INSTALASI DI LINUX OS LAINNYA (MULTI-DISTRO)
+-----------------------------------------------
+Untuk memindahkan dan menginstal `m365` di distro Linux lain (Ubuntu/Debian,
+RHEL/AlmaLinux/Rocky/Fedora, Arch/Manjaro, openSUSE, Alpine):
+
+- Gunakan script installer otomatis:
+  chmod +x install.sh
+  ./install.sh
+
+- Untuk panduan lengkap per distro Linux & cara migrasi sesi cookies, baca:
+  /home/andi/script/test18/panduan-install-linux.txt
+
+
+6. AKSES DOCKER CONTAINER & BROWSER RPA (SETARA AGY / ANTIGRAVITY)
+------------------------------------------------------------------
+Sekarang `m365` dilengkapi kemampuan **Docker + Browser RPA (CDP Port 9222)**
+dan **Autonomous Agent Loop** persis seperti `agy` / Antigravity:
+
+A. Deteksi Otomatis Workspace, Docker & Browser RPA:
+   Saat dijalankan di folder yang memiliki Docker atau Browser RPA (seperti
+   `/home/andi/script/test14`), `m365` secara otomatis membaca dan menyuntikkan:
+   - Daftar file lokal & isi folder `docs/`
+   - Status container Docker aktif (`docker ps`, `docker-compose.yml`, `cloudflare_url.txt`)
+   - Daftar tab & isi layar penuh Browser RPA (`chromium-rpa` di `http://localhost:9222`)
+   - Eksekusi otomatis perintah inspeksi/RPA dan pengiriman balik outputnya ke
+     Copilot secara berkesinambungan (Autonomous Agent Loop).
+
+B. Perintah CLI Langsung (`m365 rpa` & `m365 docker`):
+   - Cek status Docker, URL Cloudflare Tunnel, & Tab Browser RPA:
+     m365 rpa status
+
+   - Lihat daftar tab yang terbuka di Browser RPA Docker:
+     m365 rpa tabs
+
+   - Baca seluruh teks & tombol interaktif dari layar Browser RPA saat ini:
+     m365 rpa content
+
+   - Klik tombol/elemen di layar Browser RPA (berdasarkan teks atau selector):
+     m365 rpa click "Resume" --by-text
+     m365 rpa click "Start Exam Lab" --by-text
+
+   - Ketik teks ke input di layar Browser RPA:
+     m365 rpa type "input[type='email']" "user@example.com"
+
+   - Buka URL baru di Browser RPA:
+     m365 rpa goto "https://skillbuilder.aws/..."
+
+   - Ambil screenshot dari Browser RPA Docker:
+     m365 rpa screenshot -o layar_rpa.png
+
+   - Analisa layar Browser RPA saat ini langsung dengan Copilot:
+     m365 rpa ask "Analisa halaman lab AWS Skill Builder ini dan kerjakan"
+
+   - Jalankan perintah Docker:
+     m365 docker ps
+     m365 docker logs chromium-rpa
+
+C. Perintah Slash di Mode Interaktif (`m365`):
+   - `/rpa status`            -> Cek container Docker, URL Cloudflare, & tab RPA
+   - `/rpa tabs`              -> Lihat tab aktif di Browser RPA Docker
+   - `/rpa content`           -> Tampilkan isi teks & tombol dari Browser RPA
+   - `/rpa click <teks>`      -> Klik tombol/elemen di Browser RPA Docker
+   - `/rpa type <sel> <teks>` -> Isi input di Browser RPA Docker
+   - `/rpa goto <url>`        -> Pindah ke URL di Browser RPA Docker
+   - `/rpa screenshot [file]` -> Simpan screenshot layar Browser RPA Docker
+   - `/rpa ask <instruksi>`   -> Kirim isi layar Browser RPA ke Copilot untuk dianalisa/dikerjakan
+   - `/docker <subcommand>`   -> Jalankan perintah Docker langsung dari REPL
+
+
+7. M365 9ROUTER GATEWAY & INTEGRASI SEBAGAI OTAK HERMES AGENT
+-------------------------------------------------------------
+`m365` kini memiliki server gateway bergaya **9Router** (`m365 router`) yang
+menyediakan endpoint OpenAI (`/v1/models`, `/v1/chat/completions`, `/v1/responses`),
+Anthropic (`/v1/messages`), serta **Web Dashboard UI** dan terhubung sebagai
+otak **Hermes Agent** (WhatsApp, Telegram, & Hermes CLI):
+
+A. Endpoint & Web Dashboard M365 9Router:
+   - Web Dashboard UI : http://localhost:5365  (LAN: http://192.168.1.10:5365)
+   - OpenAI Base URL  : http://localhost:5365/v1
+   - Health & Status  : http://localhost:5365/health
+
+B. Mengelola Layanan Background (Systemd User Service):
+   Layanan `hermes-m365-router.service` sudah aktif otomatis di background:
+   - Cek status : systemctl --user status hermes-m365-router
+   - Restart    : systemctl --user restart hermes-m365-router
+   - Lihat log  : journalctl --user -u hermes-m365-router -f
+
+   Atau menjalankan manual dari terminal (mendukung Cloudflare Tunnel publik):
+   m365 router --port 5365
+   m365 router --port 5365 --cloudflare
+
+C. Cara Mengaktifkan M365 sebagai Otak di Hermes (WhatsApp / Telegram / CLI):
+   Ketik perintah berikut di chat Hermes Anda:
+   - /model m365 --provider "M365 Router"
+   - /model m365-agent --provider "M365 Router"
+   - /model m365-rpa --provider "M365 Router"
+   - /model m365-plan --provider "M365 Router"
+   - /model m365-boost --provider "M365 Router"
+   - /model m365-goal --provider "M365 Router"
+   - /model m365-teamwork --provider "M365 Router"
+   (Bisa juga diakses melalui Agy Proxy: `/model m365 --provider "Agy Proxy"`)
+
+
+8. FITUR BACA FOLDER LINUX OTOMATIS (SETARA AGY & CLAUDE CODE)
+--------------------------------------------------------------
+`m365` CLI kini mendukung pembacaan folder kerja Linux secara otomatis saat login
+(`m365 login`) maupun saat masuk ke CLI (`m365`), setara dengan `agy` dan `claude`:
+
+A. Otomatis Baca Folder Saat Login & Masuk CLI:
+   - Menampilkan kotak **Workspace & Folder Reader** berisi path folder aktif,
+     statistik jumlah file & sub-folder, daftar script utama, dan dokumen aturan
+     proyek (`CLAUDE.md`, `AGENTS.md`, `M365.md`, `README.md`, `docs/*`).
+   - Menampilkan folder aktif pada prompt interaktif: `⚡ [📁 ~/script/test14] m365 ❯`
+
+B. Membuka / Membaca Folder dari Terminal Linux:
+   - `m365`                                              -> Baca folder saat ini
+   - `m365 /home/andi/script/test14`                     -> Masuk & baca folder target
+   - `m365 /home/andi/script/test14 "Jelaskan folder ini"` -> Baca folder & tanya langsung
+   - `m365 --cwd /path/folder --add-dir /path/ekstra`    -> Set folder utama & tambahan
+   - `m365 dir /home/andi/script/test14`                 -> Tampilkan pohon direktori folder
+
+C. Membaca / Pindah Folder di Dalam Sesi Interaktif (`m365 ❯`):
+   - Ketik langsung `/home/andi/script/test14` atau `./docs` untuk pindah & baca folder.
+   - Ketik `/home/andi/script/test14 analisa script di sini` untuk langsung tanya isi folder.
+   - Gunakan `/dir [path]`, `/cd <path>`, `/add-dir <path>`, `/ls`, `/tree`, `/read <path>`.
+   - Gunakan `@folder` atau `@file` (misal: `Analisa @docs dan @rpa.py`).
+========================================================================
