@@ -87,6 +87,8 @@ const KNOWN_SLASH_COMMANDS = new Set([
   '/browser',
   '/schedule',
   '/skills',
+  '/skill',
+  '/finops',
   '/run',
   '/apply',
   '/agent',

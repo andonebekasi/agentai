@@ -57,6 +57,7 @@ services:
       - LOG_LEVEL=${OPENCLAW_LOG_LEVEL:-info}
     volumes:
       - ./data/openclaw:/home/node/.openclaw
+      - ./skills/finops-cloud:/app/skills/finops-cloud:ro
       - ${HOME:-/root}/.config/m365-copilot-cli:/home/node/.config/m365-copilot-cli:ro
       - ./m365-agent-cli:/opt/m365-agent-cli:ro
     depends_on:
@@ -88,6 +89,7 @@ services:
       - HERMES_WRITE_SAFE_ROOT=/opt/data
     volumes:
       - ./data/hermes:/opt/data
+      - ./skills/finops-cloud:/opt/hermes/skills/devops/finops-cloud:ro
       - ${HOME:-/root}/.config/m365-copilot-cli:/root/.config/m365-copilot-cli:ro
       - ./m365-agent-cli:/opt/m365-agent-cli:ro
     depends_on:
@@ -119,6 +121,7 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-router-key}
     volumes:
       - ./data/nanoclaw:/app/data
+      - ./skills/finops-cloud:/app/.claude/skills/finops-cloud:ro
       - ${HOME:-/root}/.config/m365-copilot-cli:/root/.config/m365-copilot-cli:ro
       - ./m365-agent-cli:/opt/m365-agent-cli:ro
     depends_on:

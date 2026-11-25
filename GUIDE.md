@@ -94,11 +94,11 @@ OPENAI_API_KEY=router-key
 # Buka sesi chat interaktif
 docker compose exec hermes hermes chat
 
-# Lihat daftar skill yang aktif
+# Lihat daftar skill yang aktif (termasuk finops-cloud)
 docker compose exec hermes hermes skills list
 
-# Jalankan perintah inspeksi kode
-docker compose exec hermes hermes ask "Tolong inspeksi struktur project ini"
+# Jalankan prompt FinOps multi-cloud
+docker compose exec hermes hermes ask "Audit pemborosan cloud AWS dan OCI"
 ```
 
 ---
@@ -125,8 +125,11 @@ docker compose exec openclaw node openclaw.mjs onboard
 # Cek status kesehatan gateway dan koneksi kanal chat
 docker compose exec openclaw node openclaw.mjs status
 
-# Menjalankan satu turn instruksi agen langsung
-docker compose exec openclaw node openclaw.mjs agent --message "Ringkas log hari ini"
+# Cek info skill FinOps di OpenClaw (Status: Ready)
+docker compose exec openclaw node openclaw.mjs skills info finops-cloud
+
+# Menjalankan satu turn instruksi agen FinOps langsung
+docker compose exec openclaw node openclaw.mjs agent --message "Jalankan audit FinOps untuk AWS dan Azure"
 ```
 
 ---

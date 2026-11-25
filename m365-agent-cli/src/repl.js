@@ -72,6 +72,7 @@ export function printReplHelp() {
   console.log(`  ${chalk.yellow('/browser <url> [prompt]')}   Buka halaman web via Playwright & analisa isinya dengan Copilot`);
   console.log(`  ${chalk.yellow('/schedule <durasi> <tugas>')}Jalankan prompt berulang/terjadwal (contoh: /schedule 5m Cek status server)`);
   console.log(`  ${chalk.yellow('/skills')}                   Lihat daftar custom skills yang terpasang`);
+  console.log(`  ${chalk.yellow('/finops [check|all|aws..]')} Multi-Cloud FinOps audit via CLI native (AWS, GCP, Azure, OCI, Tencent)`);
 
   console.log(chalk.white.bold('\n  [Docker Container & Browser RPA Control (CDP Port 9222 — Setara AGY)]'));
   console.log(`  ${chalk.yellow('/rpa [status|tabs]')}        Cek status Docker Container, Cloudflare Tunnel, & Tab Browser RPA`);
@@ -1003,9 +1004,31 @@ export async function startInteractiveRepl(options = {}) {
           break;
         }
 
+        case '/skill':
         case '/skills': {
           const skills = listSkills();
-          console.log(chalk.cyan.bold(`\n🧩 Daftar Skills (${SKILLS_DIR}):`));
+          if (restText) {
+            const targetSkill = skills.find(
+              (s) => s.name.toLowerCase() === restText.toLowerCase()
+            );
+            if (targetSkill && fs.existsSync(targetSkill.path)) {
+              console.log(chalk.cyan.bold(`\n🧩 Detail Skill: ${targetSkill.name} (${targetSkill.scope})`));
+              console.log(chalk.gray(`Path: ${targetSkill.path}\n`));
+              try {
+                const content = fs.readFileSync(targetSkill.path, 'utf8');
+                console.log(content.slice(0, 3000));
+                if (content.length > 3000) {
+                  console.log(chalk.gray(`\n... [Dipotong, total panjang: ${content.length} karakter] ...`));
+                }
+              } catch (e) {
+                console.log(chalk.red(`Gagal membaca file skill: ${e.message}`));
+              }
+              break;
+            } else {
+              console.log(chalk.yellow(`Skill "${restText}" tidak ditemukan.`));
+            }
+          }
+          console.log(chalk.cyan.bold(`\n🧩 Daftar Skills:`));
           if (skills.length === 0) {
             console.log(
               chalk.gray(
@@ -1016,6 +1039,36 @@ export async function startInteractiveRepl(options = {}) {
             skills.forEach((s, i) => {
               console.log(`  ${i + 1}. ${chalk.green.bold(s.name)} (${s.scope}) -> ${chalk.gray(s.path)}`);
             });
+            console.log(chalk.gray(`  (Ketik "/skill <nama>" untuk melihat detail instruksi)`));
+          }
+          break;
+        }
+
+        case '/finops': {
+          const sub = (restText || 'check').trim();
+          const auditScriptPaths = [
+            path.join(process.cwd(), '.agents', 'skills', 'finops-cloud', 'scripts', 'finops_audit.sh'),
+            path.join(process.cwd(), '.m365', 'skills', 'finops-cloud', 'scripts', 'finops_audit.sh'),
+            path.join(process.cwd(), 'skills', 'finops-cloud', 'scripts', 'finops_audit.sh'),
+            path.join(SKILLS_DIR, 'finops-cloud', 'scripts', 'finops_audit.sh')
+          ];
+          const scriptFile = auditScriptPaths.find((p) => fs.existsSync(p));
+          if (!scriptFile) {
+            console.log(chalk.red('Skrip finops_audit.sh tidak ditemukan.'));
+            break;
+          }
+          console.log(chalk.cyan.bold(`\n☁️ Menjalankan Multi-Cloud FinOps Audit [${sub}]...`));
+          const res = await executeLocalCommand(`bash "${scriptFile}" ${sub}`);
+          lastCommandOutput = res.output;
+          console.log(res.output);
+          const askSend = await new Promise((resolve) =>
+            rl.question(chalk.yellow('\n❯ Kirim hasil audit FinOps ini ke Copilot untuk dianalisis & disusun rekomendasinya? [Y/n]: '), resolve)
+          );
+          const ans = (askSend || '').trim().toLowerCase();
+          if (ans === '' || ans === 'y' || ans === 'yes') {
+            await sendToCopilot(
+              `Tolong lakukan analisa FinOps mendalam berdasarkan hasil audit Cloud Native CLI berikut ini:\n\n\`\`\`text\n${lastCommandOutput}\n\`\`\`\n\nSusun rekomendasi tindakan penghematan dengan format:\n1. Quick Wins (Eliminasi pemborosan langsung)\n2. Rightsizing & Recommender Insights\n3. Estimasi Penghematan & Action Plan Prioritas.`
+            );
           }
           break;
         }

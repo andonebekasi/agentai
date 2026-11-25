@@ -64,8 +64,10 @@ Menu interaktif akan muncul sehingga Anda dapat memilih paket instalasi sesuai k
    - Auto-check & auto-install Docker Engine + Compose v2 (jika belum ada)
    - Auto-install Andi Pangeran M365 Copilot Agent CLI (Tinggal login email M365)
    - Opsi setup FRP Client untuk remote NAT traversal ke VPS
+   - **Bebas Pilih Update Komponen**: Anda dapat memilih update semua, memilih komponen tertentu (OpenClaw, Hermes, NanoClaw), atau lewati update untuk startup instan
 2. **[AgentAI Stack Saja] OpenClaw + Hermes + NanoClaw + 9Router**
    - Auto-check/install Docker + Auto-install M365 CLI (Tinggal login email M365)
+   - Pilihan bebas update komponen: OpenClaw, Hermes, NanoClaw
 3. **[Docker Saja] Auto-Check & Install Docker Engine & Compose (v2)**
    - Menjalankan `check-docker.sh` untuk distro Linux apa saja
 4. **[M365 CLI Saja] Andi Pangeran M365 Copilot Agent CLI**
@@ -125,7 +127,15 @@ Script ini otomatis:
 - **Auto-install Andi Pangeran M365 CLI**: Memeriksa dan otomatis memasang M365 Copilot Agent CLI untuk digunakan oleh OpenClaw, Hermes Agent, NanoClaw, dan 9Router. Anda **tinggal login menggunakan email M365** (`m365 login`).
 - Menyiapkan file `.env` dari `.env.example` jika belum ada.
 - Menyiapkan direktori data persistent (`./data/`).
-- Mengunduh image terbaru (`decolua/9router:latest`, `ghcr.io/openclaw/openclaw:latest`, `nousresearch/hermes-agent:latest`) dan membangun `nanoclaw`.
+- **Pilihan Fleksibel Update Image Komponen**:
+  - Secara default saat dijalankan di terminal, Anda dapat memilih: **1) Lewati Update (Gunakan image lokal - Sangat Cepat)**, **2) Update Semua**, atau **3) Pilih Komponen Tertentu (OpenClaw / Hermes / NanoClaw / 9Router)**.
+  - Image yang belum pernah diunduh atau belum dibangun akan otomatis disiapkan pertama kali.
+  - Opsi flag CLI mandiri:
+    - `./start.sh --skip-update` (Gunakan versi lokal tanpa unduh ulang)
+    - `./start.sh --update-all` (Update semua: OpenClaw + Hermes + NanoClaw + 9Router)
+    - `./start.sh --update-openclaw` (Update OpenClaw saja)
+    - `./start.sh --update-hermes` (Update Hermes Agent saja)
+    - `./start.sh --update-nanoclaw` (Rebuild & update NanoClaw saja)
 - Menjalankan seluruh container di background.
 
 > **Tips Cek Docker Saja:** Anda juga dapat menjalankan script mandiri `check-docker.sh` kapan saja untuk memeriksa atau menginstall Docker & Compose:
@@ -189,15 +199,23 @@ docker compose exec openclaw node openclaw.mjs status
 docker compose exec openclaw node openclaw.mjs --help
 ```
 
+### OpenClaw CLI:
+```bash
+docker compose exec openclaw node openclaw.mjs skills info finops-cloud
+docker compose exec openclaw node openclaw.mjs agent --message "Audit biaya cloud AWS"
+```
+
 ### Hermes Agent CLI:
 ```bash
 docker compose exec hermes hermes chat
 docker compose exec hermes hermes skills list
+docker compose exec hermes hermes ask "Jalankan rekomendasi FinOps"
 ```
 
 ### NanoClaw CLI:
 ```bash
 docker compose exec nanoclaw ncl --help
+docker compose exec nanoclaw ncl status
 ```
 
 ---
@@ -225,6 +243,51 @@ m365 router
 Router akan berjalan di port `5365` (`http://localhost:5365/v1` atau `http://host.docker.internal:5365/v1`).
 Model yang tersedia: `m365`, `m365-agent`, `m365-rpa`, `m365-plan`.
 Anda dapat mendaftarkan endpoint ini ke dalam **9Router** untuk digunakan oleh OpenClaw, Hermes, dan NanoClaw tanpa biaya API tambahan!
+
+---
+
+## 💰 Multi-Cloud FinOps Skill (AWS, GCP, Azure, OCI, Tencent Cloud)
+
+Agent AI kini dilengkapi dengan skill **FinOps Multi-Cloud** berbasis **CLI Cloud Native** (`aws`, `gcloud`, `az`, `oci`, `tccli`) untuk:
+1. **Audit & Eliminasi Pemborosan (Waste Detection)**: Mendeteksi unattached disk/volumes, IP publik statis/elastis menganggur, VM berstatus stopped/deallocated yang menahan disk berbayar, dan snapshot usang.
+2. **Analisis Biaya & Tagihan (Cost & Billing Visibility)**: Query biaya berjalan (MTD), proyeksi akhir bulan, dan status budget alert.
+3. **Rightsizing & Diskon Komitmen**: Rekomendasi AWS Compute Optimizer, GCP Recommender, Azure Advisor, OCI Optimizer, serta evaluasi Savings Plans / Reserved Instances / CUDs.
+
+### Cara Menjalankan Audit FinOps:
+
+**1. Menggunakan Skrip Audit Mandiri:**
+```bash
+# Periksa ketersediaan & login 5 cloud native CLI
+./skills/finops-cloud/scripts/finops_audit.sh check
+
+# Audit menyeluruh seluruh cloud yang aktif
+./skills/finops-cloud/scripts/finops_audit.sh all
+
+# Audit per-cloud provider
+./skills/finops-cloud/scripts/finops_audit.sh aws
+./skills/finops-cloud/scripts/finops_audit.sh gcp
+./skills/finops-cloud/scripts/finops_audit.sh azure
+./skills/finops-cloud/scripts/finops_audit.sh oci
+./skills/finops-cloud/scripts/finops_audit.sh tencent
+```
+
+**2. Melalui M365 Agent CLI REPL:**
+Ketik command `/finops` di sesi interaktif `m365`:
+```bash
+m365
+? m365> /finops check
+? m365> /finops oci
+? m365> /finops all
+```
+*(Hasil audit dapat otomatis dikirimkan ke Copilot untuk dianalisis dan disusun laporan rekomendasi penghematannya).*
+
+**3. Lokasi Berkas Skill & Referensi:**
+- File Instruksi Skill: `.agents/skills/finops-cloud/SKILL.md` (juga tersedia di `.m365/skills/` dan `~/.config/m365-copilot-cli/skills/`)
+- Panduan Perintah AWS: [references/aws-finops.md](.agents/skills/finops-cloud/references/aws-finops.md)
+- Panduan Perintah GCP: [references/gcp-finops.md](.agents/skills/finops-cloud/references/gcp-finops.md)
+- Panduan Perintah Azure: [references/azure-finops.md](.agents/skills/finops-cloud/references/azure-finops.md)
+- Panduan Perintah OCI: [references/oci-finops.md](.agents/skills/finops-cloud/references/oci-finops.md)
+- Panduan Perintah Tencent: [references/tencent-finops.md](.agents/skills/finops-cloud/references/tencent-finops.md)
 
 ---
 

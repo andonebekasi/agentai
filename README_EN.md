@@ -66,8 +66,10 @@ An interactive menu will display allowing you to select what you want to install
      • Auto-Check & Auto-Install Docker Engine + Compose (if not yet installed)
      • Auto-Install Andi Pangeran M365 Copilot Agent CLI (Just Login with M365 Email)
      • Option to configure FRP Client for NAT Traversal to VPS
+     • Component Update Flexibility: Freely choose to update OpenClaw, Hermes, and NanoClaw, or skip updates
   2) [AgentAI Stack Only] OpenClaw + Hermes + NanoClaw + 9Router
      • Auto-Check/Install Docker + Auto-Install M365 CLI (Just Login with M365 Email)
+     • Component Update Flexibility: Freely choose which components to update
   3) [Docker Only] Auto-Check & Install Docker Engine & Compose (v2)
      • Runs check-docker.sh for any Linux distro
   4) [M365 CLI Only] Andi Pangeran M365 Copilot Agent CLI
@@ -120,7 +122,15 @@ What this does automatically:
 - **Auto-install Andi Pangeran M365 CLI**: Installs the M365 Copilot Agent CLI and configures container mounts for OpenClaw, Hermes, NanoClaw, and 9Router. You **only need to log in with your M365 email** (`m365 login`).
 - Generates `.env` from `.env.example` if missing.
 - Sets up persistent data folders (`./data/`).
-- Pulls latest prebuilt images and builds NanoClaw.
+- **Flexible Component Image Updates**:
+  - Interactive choices when running in a terminal: **1) Skip update (use existing local images - Fast)**, **2) Update all**, or **3) Select specific components (OpenClaw / Hermes / NanoClaw / 9Router)**.
+  - Automatically pulls or builds any missing image on first run.
+  - Command-line flags available:
+    - `./start.sh --skip-update` (Use existing local images)
+    - `./start.sh --update-all` (Pull all latest images & rebuild NanoClaw)
+    - `./start.sh --update-openclaw` (Update OpenClaw image only)
+    - `./start.sh --update-hermes` (Update Hermes Agent image only)
+    - `./start.sh --update-nanoclaw` (Rebuild & update NanoClaw only)
 - Launches all containers in detached mode.
 
 > **Check Docker Independently:**
@@ -172,6 +182,51 @@ m365 router
 The router runs on port `5365` (`http://localhost:5365/v1` or `http://host.docker.internal:5365/v1`).
 Available models: `m365`, `m365-agent`, `m365-rpa`, `m365-plan`.
 You can register this endpoint in **9Router** to provide free Copilot LLM generation across OpenClaw, Hermes, and NanoClaw!
+
+---
+
+## 💰 Multi-Cloud FinOps Skill (AWS, GCP, Azure, OCI, Tencent Cloud)
+
+The AI Agent now includes a comprehensive **Multi-Cloud FinOps skill** powered by **Cloud Native CLIs** (`aws`, `gcloud`, `az`, `oci`, `tccli`) for:
+1. **Waste Detection & Elimination**: Unattached persistent disks/volumes, unassociated public/elastic IPs, stopped/deallocated compute VMs incurring storage costs, and orphaned snapshots.
+2. **Cost & Billing Visibility**: Month-to-Date (MTD) usage queries, month-end cost forecast, and budget alert rules.
+3. **Rightsizing & Commitments**: AWS Compute Optimizer, GCP Recommender, Azure Advisor, OCI Optimizer, and evaluation of Savings Plans / Reserved Instances / CUDs.
+
+### How to Run FinOps Audits:
+
+**1. Standalone Multi-Cloud Audit Script:**
+```bash
+# Check status & credentials for all 5 native cloud CLIs
+./skills/finops-cloud/scripts/finops_audit.sh check
+
+# Complete audit across all active clouds
+./skills/finops-cloud/scripts/finops_audit.sh all
+
+# Per-provider audit
+./skills/finops-cloud/scripts/finops_audit.sh aws
+./skills/finops-cloud/scripts/finops_audit.sh gcp
+./skills/finops-cloud/scripts/finops_audit.sh azure
+./skills/finops-cloud/scripts/finops_audit.sh oci
+./skills/finops-cloud/scripts/finops_audit.sh tencent
+```
+
+**2. Inside M365 Agent CLI REPL:**
+Use the `/finops` command:
+```bash
+m365
+? m365> /finops check
+? m365> /finops oci
+? m365> /finops all
+```
+*(Audit findings can automatically be sent to Copilot for AI-assisted cost optimization strategy and executive reporting).*
+
+**3. Skill Files & References:**
+- Main Skill Guide: `.agents/skills/finops-cloud/SKILL.md` (also in `.m365/skills/` and `~/.config/m365-copilot-cli/skills/`)
+- AWS Commands: [references/aws-finops.md](.agents/skills/finops-cloud/references/aws-finops.md)
+- GCP Commands: [references/gcp-finops.md](.agents/skills/finops-cloud/references/gcp-finops.md)
+- Azure Commands: [references/azure-finops.md](.agents/skills/finops-cloud/references/azure-finops.md)
+- OCI Commands: [references/oci-finops.md](.agents/skills/finops-cloud/references/oci-finops.md)
+- Tencent Commands: [references/tencent-finops.md](.agents/skills/finops-cloud/references/tencent-finops.md)
 
 ---
 

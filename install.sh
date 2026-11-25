@@ -38,6 +38,7 @@ ACTION=""
 FRP_SERVER_ADDR=""
 FRP_AUTH_TOKEN=""
 FRP_SERVER_PORT="7000"
+START_ARGS=()
 
 print_banner() {
     echo -e "${CYAN}${BOLD}"
@@ -61,6 +62,14 @@ usage() {
     echo "  --frp-server                 Install & Konfigurasi FRP Server (frps) untuk VPS publik"
     echo "  --frp-both                   Install FRP Client & Server sekaligus"
     echo "  --uninstall-frp              Copot instalasi FRP dari sistem"
+    echo ""
+    echo "Pilihan Update Komponen (OpenClaw, Hermes, NanoClaw, 9Router):"
+    echo "  --update-all                 Tarik/bangun ulang seluruh image (OpenClaw, Hermes, NanoClaw, 9Router)"
+    echo "  --skip-update, --no-update   Lewati update image lokal (hanya download/build jika belum ada)"
+    echo "  --update-openclaw            Update image OpenClaw saja"
+    echo "  --update-hermes              Update image Hermes Agent saja"
+    echo "  --update-nanoclaw            Update & build ulang NanoClaw saja"
+    echo "  --update-9router             Update image 9Router saja"
     echo ""
     echo "Opsi Tambahan untuk FRP:"
     echo "  --server-addr <ip/domain>    Alamat IP publik VPS (untuk FRP client)"
@@ -119,6 +128,30 @@ while [[ $# -gt 0 ]]; do
             ;;
         --uninstall-frp)
             ACTION="uninstall-frp"
+            shift
+            ;;
+        --update-all)
+            START_ARGS+=("--update-all")
+            shift
+            ;;
+        --skip-update|--no-update)
+            START_ARGS+=("--skip-update")
+            shift
+            ;;
+        --update-openclaw)
+            START_ARGS+=("--update-openclaw")
+            shift
+            ;;
+        --update-hermes)
+            START_ARGS+=("--update-hermes")
+            shift
+            ;;
+        --update-nanoclaw)
+            START_ARGS+=("--update-nanoclaw")
+            shift
+            ;;
+        --update-9router)
+            START_ARGS+=("--update-9router")
             shift
             ;;
         --server-addr)
@@ -430,6 +463,41 @@ run_frp_installer() {
 # ------------------------------------------------------------------------------
 # 8. Menjalankan AgentAI Stack
 # ------------------------------------------------------------------------------
+choose_component_updates() {
+    if [ -t 0 ] && [ ${#START_ARGS[@]} -eq 0 ]; then
+        echo ""
+        echo -e "${CYAN}${BOLD}[UPDATE KOMPONEN AGENTAI]${RESET}"
+        echo -e "Anda dapat memilih apakah ingin mengupdate image/service OpenClaw, Hermes & NanoClaw:"
+        echo -e "  ${CYAN}1) Update Semua${RESET} (Tarik OpenClaw, Hermes, 9Router & Rebuild NanoClaw)"
+        echo -e "  ${CYAN}2) Pilih Komponen${RESET} (Boleh pilih sendiri: OpenClaw, Hermes, dan/atau NanoClaw)"
+        echo -e "  ${CYAN}3) Lewati Update${RESET} (Gunakan versi yang ada di mesin / hemat bandwidth & waktu) [Default]"
+        echo ""
+        read -r -p "Pilihan update [1-3] (default: 3): " update_menu_choice
+        case "${update_menu_choice:-3}" in
+            1)
+                START_ARGS+=("--update-all")
+                ;;
+            2)
+                echo -e "${BLUE}Pilih komponen yang ingin Anda update [y/N]:${RESET}"
+                read -r -p "  - Update OpenClaw (ghcr.io/openclaw/openclaw:latest)? [y/N]: " uc_oc
+                case "$uc_oc" in [yY][eE][sS]|[yY]) START_ARGS+=("--update-openclaw") ;; esac
+                read -r -p "  - Update Hermes Agent (nousresearch/hermes-agent:latest)? [y/N]: " uc_hm
+                case "$uc_hm" in [yY][eE][sS]|[yY]) START_ARGS+=("--update-hermes") ;; esac
+                read -r -p "  - Update & Rebuild NanoClaw? [y/N]: " uc_nc
+                case "$uc_nc" in [yY][eE][sS]|[yY]) START_ARGS+=("--update-nanoclaw") ;; esac
+                read -r -p "  - Update 9Router (decolua/9router:latest)? [y/N]: " uc_nr
+                case "$uc_nr" in [yY][eE][sS]|[yY]) START_ARGS+=("--update-9router") ;; esac
+                if [ ${#START_ARGS[@]} -eq 0 ]; then
+                    START_ARGS+=("--skip-update")
+                fi
+                ;;
+            *)
+                START_ARGS+=("--skip-update")
+                ;;
+        esac
+    fi
+}
+
 start_agentai_stack() {
     ensure_repo_present
     ensure_docker_and_compose
@@ -443,7 +511,7 @@ start_agentai_stack() {
     fi
 
     echo -e "${CYAN}[LAUNCH] Memulai AgentAI stack melalui ./start.sh...${RESET}"
-    ./start.sh
+    ./start.sh "${START_ARGS[@]}"
 }
 
 # ------------------------------------------------------------------------------
@@ -458,9 +526,11 @@ if [ -z "$ACTION" ]; then
         echo -e "     ${YELLOW}• Auto-Check & Auto-Install Docker Engine + Compose (jika belum ada)${RESET}"
         echo -e "     ${YELLOW}• Auto-Install Andi Pangeran M365 Copilot Agent CLI (Tinggal Login Email M365)${RESET}"
         echo -e "     ${YELLOW}• Opsi konfigurasi FRP Reverse Proxy Client ke VPS${RESET}"
+        echo -e "     ${YELLOW}• Bebas pilih update komponen: OpenClaw, Hermes, NanoClaw${RESET}"
         echo ""
         echo -e "  ${CYAN}2) [AgentAI Stack Saja] OpenClaw + Hermes + NanoClaw + 9Router${RESET}"
         echo -e "     ${YELLOW}• Auto-Check/Install Docker + Auto-Install M365 CLI (Tinggal Login Email M365)${RESET}"
+        echo -e "     ${YELLOW}• Bebas pilih update komponen: OpenClaw, Hermes, NanoClaw${RESET}"
         echo ""
         echo -e "  ${CYAN}3) [Docker Saja] Auto-Check & Install Docker Engine & Compose (v2)${RESET}"
         echo -e "     ${YELLOW}• Menjalankan check-docker.sh untuk semua distro Linux${RESET}"
@@ -516,6 +586,7 @@ case "$ACTION" in
         ;;
 
     stack)
+        choose_component_updates
         start_agentai_stack
         ;;
 
@@ -591,6 +662,7 @@ case "$ACTION" in
         fi
 
         if [ "$START_NOW" = true ]; then
+            choose_component_updates
             start_agentai_stack
         else
             echo -e "${GREEN}Instalasi selesai!${RESET}"

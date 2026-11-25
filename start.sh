@@ -18,6 +18,88 @@ RESET="\033[0m"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ------------------------------------------------------------------------------
+# Parsing Argument & Opsi Update Komponen
+# ------------------------------------------------------------------------------
+UPDATE_ALL=false
+SKIP_UPDATE=false
+UPDATE_OPENCLAW=false
+UPDATE_HERMES=false
+UPDATE_NANOCLAW=false
+UPDATE_9ROUTER=false
+INTERACTIVE_UPDATE=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --update-all|-u)
+            UPDATE_ALL=true
+            ;;
+        --skip-update|--no-update)
+            SKIP_UPDATE=true
+            ;;
+        --update-openclaw)
+            UPDATE_OPENCLAW=true
+            ;;
+        --update-hermes)
+            UPDATE_HERMES=true
+            ;;
+        --update-nanoclaw)
+            UPDATE_NANOCLAW=true
+            ;;
+        --update-9router)
+            UPDATE_9ROUTER=true
+            ;;
+        --select-update)
+            INTERACTIVE_UPDATE=true
+            ;;
+        -h|--help)
+            echo "Penggunaan: ./start.sh [opsi]"
+            echo ""
+            echo "Opsi Update Komponen (OpenClaw, Hermes, NanoClaw, 9Router):"
+            echo "  --update-all, -u             Tarik & rebuild semua image (OpenClaw, Hermes, NanoClaw, 9Router)"
+            echo "  --skip-update, --no-update   Lewati update image lokal (hanya download/build jika belum ada)"
+            echo "  --update-openclaw            Update image OpenClaw saja"
+            echo "  --update-hermes              Update image Hermes Agent saja"
+            echo "  --update-nanoclaw            Update & build ulang NanoClaw saja"
+            echo "  --update-9router             Update image 9Router saja"
+            echo "  --select-update              Tampilkan menu interaktif pemilihan update"
+            echo "  -h, --help                   Tampilkan bantuan ini"
+            exit 0
+            ;;
+    esac
+done
+
+# Jika interaktif dan belum ada flag update yang dispesifikasikan, tanyakan ke pengguna
+if [ "$INTERACTIVE_UPDATE" = true ] || { [ "$UPDATE_ALL" = false ] && [ "$SKIP_UPDATE" = false ] && [ "$UPDATE_OPENCLAW" = false ] && [ "$UPDATE_HERMES" = false ] && [ "$UPDATE_NANOCLAW" = false ] && [ "$UPDATE_9ROUTER" = false ] && [ -t 0 ]; }; then
+    echo ""
+    echo -e "${CYAN}${BOLD}[UPDATE KOMPONEN AGENTAI]${RESET}"
+    echo -e "Pilih pembaruan (image pull & build) untuk OpenClaw, Hermes & NanoClaw:"
+    echo -e "  ${CYAN}1) Lewati Update${RESET} (Gunakan versi yang ada di mesin / Lebih Cepat) [Default]"
+    echo -e "  ${CYAN}2) Update Semua${RESET} (Tarik OpenClaw, Hermes, 9Router & Rebuild NanoClaw)"
+    echo -e "  ${CYAN}3) Pilih Komponen Tertentu${RESET} (Boleh pilih sendiri: OpenClaw / Hermes / NanoClaw / 9Router)"
+    echo ""
+    read -r -p "Masukkan pilihan [1-3] (default: 1): " update_interactive_choice
+    case "${update_interactive_choice:-1}" in
+        2)
+            UPDATE_ALL=true
+            ;;
+        3)
+            echo -e "${BLUE}Pilih komponen yang ingin Anda update [y/N]:${RESET}"
+            read -r -p "  - Update OpenClaw (ghcr.io/openclaw/openclaw:latest)? [y/N]: " uc_oc
+            case "$uc_oc" in [yY][eE][sS]|[yY]) UPDATE_OPENCLAW=true ;; esac
+            read -r -p "  - Update Hermes Agent (nousresearch/hermes-agent:latest)? [y/N]: " uc_hm
+            case "$uc_hm" in [yY][eE][sS]|[yY]) UPDATE_HERMES=true ;; esac
+            read -r -p "  - Update & Rebuild NanoClaw? [y/N]: " uc_nc
+            case "$uc_nc" in [yY][eE][sS]|[yY]) UPDATE_NANOCLAW=true ;; esac
+            read -r -p "  - Update 9Router (decolua/9router:latest)? [y/N]: " uc_nr
+            case "$uc_nr" in [yY][eE][sS]|[yY]) UPDATE_9ROUTER=true ;; esac
+            ;;
+        *)
+            SKIP_UPDATE=true
+            ;;
+    esac
+fi
+
 echo -e "${CYAN}${BOLD}"
 echo "======================================================================"
 echo "    Starting AgentAI Stack (9Router + Hermes + OpenClaw + NanoClaw)   "
@@ -135,18 +217,64 @@ source .env 2>/dev/null || true
 # ------------------------------------------------------------------------------
 echo -e "${BLUE}[4/6] Menyiapkan direktori penyimpanan persistent data...${RESET}"
 mkdir -p data/9router data/openclaw data/hermes data/nanoclaw data/m365 "$M365_CONFIG_DIR"
+mkdir -p data/openclaw/skills data/hermes/skills data/hermes/.hermes/skills data/nanoclaw/skills
+if [ -d "skills/finops-cloud" ]; then
+    cp -r skills/finops-cloud data/openclaw/skills/ 2>/dev/null || true
+    cp -r skills/finops-cloud data/hermes/skills/ 2>/dev/null || true
+    cp -r skills/finops-cloud data/hermes/.hermes/skills/ 2>/dev/null || true
+    cp -r skills/finops-cloud data/nanoclaw/skills/ 2>/dev/null || true
+fi
 chmod -R 777 data 2>/dev/null || true
-echo -e "${GREEN}✓ Direktori data siap.${RESET}"
+echo -e "${GREEN}✓ Direktori data & skills siap.${RESET}"
 
 # ------------------------------------------------------------------------------
-# 5. Pull and build images
+# 5. Pull and build images (Berdasarkan Pilihan Update Komponen)
 # ------------------------------------------------------------------------------
-echo -e "${BLUE}[5/6] Mengunduh & membangun image terbaru...${RESET}"
-echo -e "  - Pulling image prebuilt (9Router, OpenClaw, Hermes)..."
-docker compose pull 9router openclaw hermes 2>/dev/null || true
+echo -e "${BLUE}[5/6] Memeriksa & menyiapkan image container...${RESET}"
 
-echo -e "  - Building NanoClaw container..."
-docker compose build nanoclaw
+# 1. 9Router
+if [ "$UPDATE_9ROUTER" = true ] || [ "$UPDATE_ALL" = true ]; then
+    echo -e "  - ${CYAN}[UPDATE]${RESET} Pulling 9Router (decolua/9router:latest)..."
+    docker compose pull 9router 2>/dev/null || docker pull decolua/9router:latest || true
+elif ! docker image inspect decolua/9router:latest >/dev/null 2>&1; then
+    echo -e "  - ${YELLOW}[PULL]${RESET} Image 9Router belum ada di lokal, mengunduh..."
+    docker compose pull 9router 2>/dev/null || docker pull decolua/9router:latest || true
+else
+    echo -e "  - ${GREEN}[OK]${RESET} 9Router: Menggunakan image lokal (update dilewati)"
+fi
+
+# 2. OpenClaw
+if [ "$UPDATE_OPENCLAW" = true ] || [ "$UPDATE_ALL" = true ]; then
+    echo -e "  - ${CYAN}[UPDATE]${RESET} Pulling OpenClaw (ghcr.io/openclaw/openclaw:latest)..."
+    docker compose pull openclaw 2>/dev/null || docker pull ghcr.io/openclaw/openclaw:latest || true
+elif ! docker image inspect ghcr.io/openclaw/openclaw:latest >/dev/null 2>&1; then
+    echo -e "  - ${YELLOW}[PULL]${RESET} Image OpenClaw belum ada di lokal, mengunduh..."
+    docker compose pull openclaw 2>/dev/null || docker pull ghcr.io/openclaw/openclaw:latest || true
+else
+    echo -e "  - ${GREEN}[OK]${RESET} OpenClaw: Menggunakan image lokal (update dilewati)"
+fi
+
+# 3. Hermes Agent
+if [ "$UPDATE_HERMES" = true ] || [ "$UPDATE_ALL" = true ]; then
+    echo -e "  - ${CYAN}[UPDATE]${RESET} Pulling Hermes Agent (nousresearch/hermes-agent:latest)..."
+    docker compose pull hermes 2>/dev/null || docker pull nousresearch/hermes-agent:latest || true
+elif ! docker image inspect nousresearch/hermes-agent:latest >/dev/null 2>&1; then
+    echo -e "  - ${YELLOW}[PULL]${RESET} Image Hermes Agent belum ada di lokal, mengunduh..."
+    docker compose pull hermes 2>/dev/null || docker pull nousresearch/hermes-agent:latest || true
+else
+    echo -e "  - ${GREEN}[OK]${RESET} Hermes Agent: Menggunakan image lokal (update dilewati)"
+fi
+
+# 4. NanoClaw
+if [ "$UPDATE_NANOCLAW" = true ] || [ "$UPDATE_ALL" = true ]; then
+    echo -e "  - ${CYAN}[UPDATE]${RESET} Rebuilding NanoClaw (git pull & fresh rebuild)..."
+    docker compose build --no-cache nanoclaw
+elif ! docker image inspect agentai/nanoclaw:latest >/dev/null 2>&1; then
+    echo -e "  - ${YELLOW}[BUILD]${RESET} Image NanoClaw belum ada di lokal, membangun container..."
+    docker compose build nanoclaw
+else
+    echo -e "  - ${GREEN}[OK]${RESET} NanoClaw: Menggunakan image lokal (update dilewati)"
+fi
 
 # ------------------------------------------------------------------------------
 # 6. Menjalankan seluruh kontainer dengan Docker Compose
